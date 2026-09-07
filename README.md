@@ -286,35 +286,6 @@ Mời vào đọc kết quả (nếu cần)
 Hoàn tất
 
 
-Gợi ý màn hình truy vết
-
-Khi bệnh nhân đang chờ khám
-
-┌─────────────────────────────────────┐
-│             ĐANG CHỜ KHÁM           │
-│                                     │
-│  Số thứ tự: 05                     │
-│  Đang khám: 04                     │
-│                                     │
-│  Phòng: P.203                      │
-│  Bác sĩ: Nguyễn Văn A              │
-│                                     │
-│  Vui lòng chờ đến lượt             │
-└─────────────────────────────────────┘
-
-Khi bác sĩ gọi bệnh nhân
-
-┌─────────────────────────────────────┐
-│          ĐÃ ĐẾN LƯỢT KHÁM          │
-│                                     │
-│          🔔 MỜI BỆNH NHÂN           │
-│                                     │
-│  Phòng: P.203                      │
-│  Bác sĩ: Nguyễn Văn A              │
-│                                     │
-│  Vui lòng vào phòng khám           │
-└─────────────────────────────────────┘
-
 Timeline khi đang khám
 
 ✓ Đặt lịch thành công
