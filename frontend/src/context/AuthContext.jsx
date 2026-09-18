@@ -1,3 +1,4 @@
+// src/context/AuthContext.jsx
 import React, {
   createContext,
   useCallback,
@@ -86,7 +87,8 @@ export const getRoleHome = (role) => {
 
 const readStoredUser = () => {
   try {
-    const raw = localStorage.getItem(USER_KEY);
+    const raw =
+      localStorage.getItem(USER_KEY) || localStorage.getItem('user');
 
     if (!raw) return null;
 
@@ -104,13 +106,14 @@ const readStoredUser = () => {
 const persistUser = (user) => {
   if (!user) {
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('user');
+    localStorage.removeItem('role');
     return;
   }
 
-  localStorage.setItem(
-    USER_KEY,
-    JSON.stringify(user)
-  );
+  localStorage.setItem(USER_KEY, JSON.stringify(user));
+  localStorage.setItem('user', JSON.stringify(user));
+  localStorage.setItem('role', getUserRole(user));
 };
 
 export function AuthProvider({ children }) {
@@ -127,6 +130,8 @@ export function AuthProvider({ children }) {
 
     if (token) {
       localStorage.setItem(TOKEN_KEY, token);
+      localStorage.setItem('token', token);
+      localStorage.setItem('accessToken', token);
     }
 
     const sourceUser =
@@ -135,34 +140,45 @@ export function AuthProvider({ children }) {
       data?.profile ??
       data;
 
+    const currentRole = normalizeRole(
+      sourceUser?.role ??
+        sourceUser?.Role ??
+        data?.role ??
+        data?.Role
+    );
+
     const normalizedUser = {
       ...sourceUser,
-      role: normalizeRole(
-        sourceUser?.role ??
-          sourceUser?.Role ??
-          data?.role ??
-          data?.Role
-      ),
+      role: currentRole,
     };
 
     setUser(normalizedUser);
     persistUser(normalizedUser);
 
+    window.dispatchEvent(new Event('auth-change'));
+
     return {
       ...data,
       user: normalizedUser,
       accessToken: token,
+      role: currentRole,
     };
   }, []);
 
   const clearAuth = useCallback(() => {
     localStorage.removeItem(TOKEN_KEY);
     localStorage.removeItem(USER_KEY);
+    localStorage.removeItem('user');
+    localStorage.removeItem('token');
+    localStorage.removeItem('role');
+    localStorage.removeItem('accessToken');
     setUser(null);
+    window.dispatchEvent(new Event('auth-change'));
   }, []);
 
   const refreshUser = useCallback(async () => {
-    const token = localStorage.getItem(TOKEN_KEY);
+    const token =
+      localStorage.getItem(TOKEN_KEY) || localStorage.getItem('token');
     const storedUser = readStoredUser();
 
     if (!token && !storedUser) {
@@ -191,19 +207,13 @@ export function AuthProvider({ children }) {
       }
 
       return storedUser;
-    } catch (error) {
-      const status = error?.response?.status;
-
-      if (status === 401 || status === 403) {
-        clearAuth();
-        return null;
-      }
-
+    } catch {
+      // Backend chưa có /auth/me thì vẫn giữ session hiện có, KHÔNG clearAuth()
       return storedUser;
     } finally {
       setLoading(false);
     }
-  }, [clearAuth]);
+  }, []);
 
   useEffect(() => {
     refreshUser();
@@ -221,7 +231,7 @@ export function AuthProvider({ children }) {
     try {
       await logoutRequest();
     } catch {
-      // Nếu backend logout chưa sẵn sàng, vẫn logout phía frontend.
+      // Bỏ qua lỗi backend logout
     } finally {
       clearAuth();
     }
