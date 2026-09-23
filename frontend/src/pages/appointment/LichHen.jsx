@@ -1,1200 +1,361 @@
-import React, {
-  useEffect,
-  useMemo,
-  useState,
-} from 'react';
+import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+import { getApiErrorMessage, getMyAppointments } from '../../services/appointmentService';
 
-import { useNavigate } from 'react-router-dom';
-
-import {
-  createExaminationAppointment,
-  getAppointmentOptions,
-  getApiErrorMessage,
-  getTakenTimes,
-} from '../../services/appointmentService';
-
-const generateSlots = (
-  start = '07:00',
-  end = '16:00',
-  stepMinutes = 60
-) => {
-  const slots = [];
-
-  const [startHour, startMin] = start
-    .split(':')
-    .map(Number);
-
-  const [endHour, endMin] = end
-    .split(':')
-    .map(Number);
-
-  const current = new Date();
-
-  current.setHours(
-    startHour,
-    startMin,
-    0,
-    0
-  );
-
-  const endTime = new Date();
-
-  endTime.setHours(
-    endHour,
-    endMin,
-    0,
-    0
-  );
-
-  while (current <= endTime) {
-    const hh = String(
-      current.getHours()
-    ).padStart(2, '0');
-
-    const mm = String(
-      current.getMinutes()
-    ).padStart(2, '0');
-
-    slots.push(`${hh}:${mm}`);
-
-    current.setMinutes(
-      current.getMinutes() + stepMinutes
-    );
-  }
-
-  return slots;
+const formatDate = (dateStr) => {
+  if (!dateStr) return '—';
+  const cleanDate = String(dateStr).substring(0, 10);
+  const parts = cleanDate.split('-');
+  if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+  
+  const d = new Date(dateStr);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}`;
 };
 
-const SLOTS = generateSlots(
-  '07:00',
-  '16:00',
-  60
-);
-
-// Giữ nguyên mã trong project cũ
-const CK_GENERAL = 'CK015';
-
-const sameCK = (a, b) => {
-  const A = String(
-    a ?? ''
-  ).toUpperCase();
-
-  const B = String(
-    b ?? ''
-  ).toUpperCase();
-
-  if (!A || !B) {
-    return false;
+const renderStatusBadge = (status) => {
+  const value = String(status || '').toLowerCase();
+  
+  if (['cancelled', 'huy'].includes(value)) {
+    return <span className="badge bg-danger px-3 py-2 rounded-pill">Đã hủy</span>;
+  }
+  if (['no_show', 'bo_luot'].includes(value)) {
+    return <span className="badge bg-dark px-3 py-2 rounded-pill">Bỏ lượt</span>;
   }
 
-  if (A === B) {
-    return true;
+  let label = status;
+  switch (value) {
+    case 'pending': 
+      label = 'Đã đặt lịch'; 
+      break;
+    case 'confirmed': 
+    case 'checked_in': 
+    case 'da_tiep_nhan': 
+      label = 'Đã xác nhận'; 
+      break;
+    case 'cho_kham': 
+    case 'cho_xet_nghiem': 
+    case 'da_den_luot': 
+    case 'cho_goi_lai': 
+      label = 'Chờ khám / Chờ XN'; 
+      break;
+    case 'dang_kham': 
+    case 'dang_lay_mau': 
+      label = 'Đang khám / Lấy mẫu'; 
+      break;
+    case 'da_chi_dinh_xn': 
+      label = 'Chỉ định xét nghiệm'; 
+      break;
+    case 'da_lay_mau': 
+    case 'ktv_tiep_nhan': 
+    case 'dang_xet_nghiem': 
+    case 'cho_duyet_kq': 
+      label = 'Chờ kết quả'; 
+      break;
+    case 'da_co_kq': 
+    case 'moi_doc_kq': 
+    case 'dang_tu_van_kq': 
+      label = 'Đã có kết quả'; 
+      break;
+    case 'completed': 
+    case 'hoan_tat': 
+      label = 'Hoàn thành'; 
+      break;
+    default:
+      label = status;
+      break;
   }
-
-  const na = A.replace(/\D/g, '');
-  const nb = B.replace(/\D/g, '');
-
-  return Boolean(
-    na &&
-    nb &&
-    na === nb
-  );
-};
-
-const getLocalToday = () => {
-  const now = new Date();
-
-  const year = now.getFullYear();
-
-  const month = String(
-    now.getMonth() + 1
-  ).padStart(2, '0');
-
-  const day = String(
-    now.getDate()
-  ).padStart(2, '0');
-
-  return `${year}-${month}-${day}`;
-};
-
-const getUserName = (user) =>
-  user?.FullName ||
-  user?.fullName ||
-  user?.HoTen ||
-  user?.hoTen ||
-  '';
-
-const getUserEmail = (user) =>
-  user?.Email ||
-  user?.email ||
-  '';
-
-export default function DatLichKham({
-  departments: departmentsProp = null,
-  allDoctors: allDoctorsProp = null,
-  currentUser: currentUserProp = null,
-}) {
-  const navigate = useNavigate();
-
-  const [
-    departments,
-    setDepartments,
-  ] = useState(
-    departmentsProp || {}
-  );
-
-  const [
-    allDoctors,
-    setAllDoctors,
-  ] = useState(
-    allDoctorsProp || []
-  );
-
-  const [
-    currentUser,
-    setCurrentUser,
-  ] = useState(
-    currentUserProp || null
-  );
-
-  const [
-    selectedCK,
-    setSelectedCK,
-  ] = useState('');
-
-  const [
-    unknownCK,
-    setUnknownCK,
-  ] = useState(false);
-
-  const [
-    prevCK,
-    setPrevCK,
-  ] = useState('');
-
-  const [
-    selectedDoctor,
-    setSelectedDoctor,
-  ] = useState('');
-
-  const [
-    selectedDate,
-    setSelectedDate,
-  ] = useState('');
-
-  const [
-    selectedTime,
-    setSelectedTime,
-  ] = useState('');
-
-  const [
-    note,
-    setNote,
-  ] = useState('');
-
-  const [
-    forOther,
-    setForOther,
-  ] = useState(false);
-
-  const [
-    selfInfo,
-    setSelfInfo,
-  ] = useState({
-    hoten:
-      getUserName(
-        currentUserProp
-      ),
-
-    sdt: '',
-    gioitinh: '',
-    ngaysinh: '',
-
-    email:
-      getUserEmail(
-        currentUserProp
-      ),
-  });
-
-  const [
-    otherInfo,
-    setOtherInfo,
-  ] = useState({
-    p_name: '',
-    p_phone: '',
-    p_gender: '',
-    p_dob: '',
-    p_email: '',
-  });
-
-  const [
-    takenTimes,
-    setTakenTimes,
-  ] = useState(
-    new Set()
-  );
-
-  const [
-    errMsg,
-    setErrMsg,
-  ] = useState('');
-
-  const [
-    loading,
-    setLoading,
-  ] = useState(false);
-
-  useEffect(() => {
-    let active = true;
-
-    const shouldLoad =
-      !departmentsProp ||
-      !allDoctorsProp ||
-      !currentUserProp;
-
-    if (!shouldLoad) {
-      return undefined;
-    }
-
-    const loadOptions =
-      async () => {
-        try {
-          const data =
-            await getAppointmentOptions();
-
-          if (!active) {
-            return;
-          }
-
-          if (
-            !departmentsProp
-          ) {
-            setDepartments(
-              data?.departments ||
-                data?.chuyenKhoa ||
-                {}
-            );
-          }
-
-          if (
-            !allDoctorsProp
-          ) {
-            setAllDoctors(
-              data?.doctors ||
-                data?.allDoctors ||
-                []
-            );
-          }
-
-          if (
-            !currentUserProp
-          ) {
-            setCurrentUser(
-              data?.currentUser ||
-                data?.user ||
-                null
-            );
-          }
-        } catch (error) {
-          if (active) {
-            setErrMsg(
-              getApiErrorMessage(
-                error,
-                'Không thể tải dữ liệu đặt lịch.'
-              )
-            );
-          }
-        }
-      };
-
-    loadOptions();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    departmentsProp,
-    allDoctorsProp,
-    currentUserProp,
-  ]);
-
-  useEffect(() => {
-    if (!currentUser) {
-      return;
-    }
-
-    setSelfInfo(
-      (prev) => ({
-        ...prev,
-
-        hoten:
-          prev.hoten ||
-          getUserName(
-            currentUser
-          ),
-
-        email:
-          prev.email ||
-          getUserEmail(
-            currentUser
-          ),
-      })
-    );
-  }, [currentUser]);
-
-  useEffect(() => {
-    const params =
-      new URLSearchParams(
-        window.location.search
-      );
-
-    const prefillCK =
-      params.get('khoa') ||
-      params.get('ck') ||
-      '';
-
-    const prefillIdbs =
-      params.get('idbs') ||
-      '';
-
-    const prefillNote =
-      params.get('note') ||
-      '';
-
-    const prefillDate =
-      params.get('date') ||
-      '';
-
-    const prefillTime =
-      params.get('time') ||
-      '';
-
-    if (prefillCK) {
-      setSelectedCK(
-        prefillCK
-      );
-    } else if (
-      Object.keys(
-        departments
-      ).length > 0
-    ) {
-      setSelectedCK(
-        (current) =>
-          current ||
-          Object.keys(
-            departments
-          )[0]
-      );
-    }
-
-    if (prefillIdbs) {
-      setSelectedDoctor(
-        prefillIdbs
-      );
-    }
-
-    if (prefillNote) {
-      setNote(
-        prefillNote
-      );
-    }
-
-    if (prefillDate) {
-      setSelectedDate(
-        prefillDate
-      );
-    }
-
-    if (prefillTime) {
-      setSelectedTime(
-        prefillTime
-      );
-    }
-  }, [departments]);
-
-  const filteredDoctors =
-    useMemo(() => {
-      return allDoctors.filter(
-        (doctor) =>
-          sameCK(
-            doctor.KhoaID ??
-              doctor.khoaId ??
-              doctor.specialtyId,
-
-            selectedCK
-          )
-      );
-    }, [
-      allDoctors,
-      selectedCK,
-    ]);
-
-  const handleUnknownCKChange =
-    (e) => {
-      const checked =
-        e.target.checked;
-
-      setUnknownCK(
-        checked
-      );
-
-      if (checked) {
-        setPrevCK(
-          selectedCK
-        );
-
-        setSelectedCK(
-          CK_GENERAL
-        );
-
-        const genDocs =
-          allDoctors.filter(
-            (doctor) =>
-              sameCK(
-                doctor.KhoaID ??
-                  doctor.khoaId ??
-                  doctor.specialtyId,
-
-                CK_GENERAL
-              )
-          );
-
-        if (
-          genDocs.length > 0
-        ) {
-          const id =
-            genDocs[0]
-              .IDBacSi ??
-            genDocs[0].id;
-
-          setSelectedDoctor(
-            String(id)
-          );
-        }
-      } else {
-        setSelectedCK(
-          prevCK ||
-            Object.keys(
-              departments
-            )[0] ||
-            ''
-        );
-
-        setSelectedDoctor('');
-      }
-    };
-
-  useEffect(() => {
-    if (
-      !selectedDoctor ||
-      !selectedDate
-    ) {
-      setTakenTimes(
-        new Set()
-      );
-
-      return;
-    }
-
-    let active = true;
-
-    const loadTakenTimes =
-      async () => {
-        try {
-          const data =
-            await getTakenTimes(
-              'EXAMINATION',
-              selectedDoctor,
-              selectedDate
-            );
-
-          if (!active) {
-            return;
-          }
-
-          const times =
-            Array.isArray(data)
-              ? data
-              : data?.times || [];
-
-          setTakenTimes(
-            new Set(
-              times.map(
-                (time) =>
-                  String(
-                    time
-                  ).substring(
-                    0,
-                    5
-                  )
-              )
-            )
-          );
-        } catch {
-          if (active) {
-            setTakenTimes(
-              new Set()
-            );
-          }
-        }
-      };
-
-    loadTakenTimes();
-
-    return () => {
-      active = false;
-    };
-  }, [
-    selectedDoctor,
-    selectedDate,
-  ]);
-
-  const handleSubmit =
-    async (e) => {
-      e.preventDefault();
-
-      setErrMsg('');
-
-      if (
-        !selectedDoctor ||
-        !selectedDate ||
-        !selectedTime
-      ) {
-        setErrMsg(
-          'Vui lòng chọn bác sĩ, ngày và giờ.'
-        );
-
-        return;
-      }
-
-      const recipientEmail =
-        forOther
-          ? otherInfo.p_email.trim()
-          : (
-              getUserEmail(
-                currentUser
-              ) ||
-              selfInfo.email
-            ).trim();
-
-      if (
-        !recipientEmail ||
-        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
-          recipientEmail
-        )
-      ) {
-        setErrMsg(
-          'Vui lòng nhập email hợp lệ.'
-        );
-
-        return;
-      }
-
-      const payload = {
-        bacsi:
-          selectedDoctor,
-
-        ngaykham:
-          selectedDate,
-
-        gio:
-          selectedTime,
-
-        noidung:
-          note,
-
-        for_other:
-          forOther,
-
-        ...(forOther
-          ? otherInfo
-          : selfInfo),
-      };
-
-      try {
-        setLoading(true);
-
-        const data =
-          await createExaminationAppointment(
-            payload
-          );
-
-        const id =
-          data?.id ??
-          data?.IDDatLich ??
-          data?.appointmentId;
-
-        if (id) {
-          navigate(
-            `/lich-hen/${id}`
-          );
-        } else {
-          navigate(
-            '/lich-hen'
-          );
-        }
-      } catch (error) {
-        setErrMsg(
-          getApiErrorMessage(
-            error,
-            'Không thể lưu lịch.'
-          )
-        );
-      } finally {
-        setLoading(false);
-      }
-    };
-
-  const todayStr =
-    getLocalToday();
 
   return (
-    <div
-      className="container py-4"
-      style={{
-        maxWidth: '780px',
-      }}
+    <span 
+      className="badge px-3 py-2 rounded-pill fw-medium" 
+      style={{ backgroundColor: '#e6f4ea', color: '#137333', border: '1px solid #ceead6' }}
     >
-      <h3 className="mb-3 fw-bold">
-        ĐẶT LỊCH KHÁM
-      </h3>
+      {label}
+    </span>
+  );
+};
 
-      {errMsg && (
-        <div className="alert alert-danger">
-          {errMsg}
-        </div>
-      )}
+export default function MyAppointments({ initialAppointments = null }) {
+  const [appointments, setAppointments] = useState(initialAppointments || []);
+  const [loading, setLoading] = useState(!initialAppointments);
+  const [error, setError] = useState('');
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('ALL');
+  
+  // States cho khoảng thời gian
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
 
-      <form
-        onSubmit={handleSubmit}
-        className="row g-3"
-        noValidate
-      >
-        {/* Chuyên khoa */}
-        <div className="col-md-6">
-          <label className="form-label d-flex align-items-center justify-content-between">
-            <span>
-              Chuyên khoa
-            </span>
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
 
-            <span className="form-check ms-2">
-              <input
-                type="checkbox"
-                id="unknownChk"
-                className="form-check-input"
-                checked={
-                  unknownCK
-                }
-                onChange={
-                  handleUnknownCKChange
-                }
-              />
+  useEffect(() => {
+    if (initialAppointments) return;
+    let active = true;
 
-              <label
-                className="form-check-label"
-                htmlFor="unknownChk"
-                style={{
-                  cursor:
-                    'pointer',
-                }}
-              >
-                Tôi chưa biết cần
-                khám gì
-              </label>
-            </span>
-          </label>
+    const loadAppointments = async () => {
+      try {
+        const data = await getMyAppointments();
+        if (!active) return;
+        const items = Array.isArray(data) ? data : data?.appointments || data?.items || [];
+        setAppointments(items);
+      } catch (err) {
+        if (active) setError(getApiErrorMessage(err, 'Không thể tải danh sách lịch hẹn.'));
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
 
-          <select
-            className="form-select"
-            disabled={unknownCK}
-            value={selectedCK}
-            onChange={(e) => {
-              setSelectedCK(
-                e.target.value
-              );
+    loadAppointments();
+    return () => { active = false; };
+  }, [initialAppointments]);
 
-              setSelectedDoctor('');
-            }}
-          >
-            {Object.entries(
-              departments
-            ).map(
-              ([id, name]) => (
-                <option
-                  key={id}
-                  value={id}
-                >
-                  {name}
-                </option>
-              )
-            )}
-          </select>
-        </div>
+  // Reset về trang 1 mỗi khi thay đổi bất kỳ bộ lọc nào
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, statusFilter, startDate, endDate]);
 
-        {/* Ngày */}
-        <div className="col-md-6">
-          <label className="form-label">
-            Ngày khám *
-          </label>
+  const filteredAppointments = appointments.filter((item) => {
+    // 1. Lọc theo trạng thái
+    if (statusFilter !== 'ALL') {
+      const itemStatus = String(item.status).toLowerCase();
+      if (statusFilter === 'pending' && itemStatus !== 'pending') return false;
+      if (statusFilter === 'confirmed' && !['confirmed', 'checked_in', 'da_tiep_nhan'].includes(itemStatus)) return false;
+      if (statusFilter === 'waiting' && !['cho_kham', 'cho_xet_nghiem', 'da_den_luot', 'cho_goi_lai'].includes(itemStatus)) return false;
+      if (statusFilter === 'in_progress' && !['dang_kham', 'dang_lay_mau', 'da_chi_dinh_xn'].includes(itemStatus)) return false;
+      if (statusFilter === 'testing' && !['da_lay_mau', 'ktv_tiep_nhan', 'dang_xet_nghiem', 'cho_duyet_kq'].includes(itemStatus)) return false;
+      if (statusFilter === 'has_result' && !['da_co_kq', 'moi_doc_kq', 'dang_tu_van_kq'].includes(itemStatus)) return false;
+      if (statusFilter === 'completed' && !['completed', 'hoan_tat'].includes(itemStatus)) return false;
+      if (statusFilter === 'cancelled' && !['cancelled', 'huy', 'no_show', 'bo_luot'].includes(itemStatus)) return false;
+    }
 
-          <input
-            type="date"
-            className="form-control"
-            required
-            min={todayStr}
-            value={selectedDate}
-            onChange={(e) =>
-              setSelectedDate(
-                e.target.value
-              )
-            }
-          />
-        </div>
+    // 2. Lọc theo khoảng thời gian
+    if (startDate !== '') {
+      if (!item.appointmentDate || item.appointmentDate < startDate) return false;
+    }
+    if (endDate !== '') {
+      if (!item.appointmentDate || item.appointmentDate > endDate) return false;
+    }
 
-        {/* Giờ */}
-        <div className="col-md-6">
-          <label className="form-label">
-            Giờ *
-          </label>
+    // 3. Lọc theo text
+    if (searchTerm.trim() !== '') {
+      const term = searchTerm.toLowerCase();
+      const id = (item.id || '').toLowerCase();
+      const customer = (item.customerName || '').toLowerCase();
+      const doctor = (item.doctorName || '').toLowerCase();
+      const typeStr = item.type === 'EXAMINATION' ? 'khám bệnh' : 'xét nghiệm';
 
-          <select
-            className="form-select"
-            required
-            value={selectedTime}
-            onChange={(e) =>
-              setSelectedTime(
-                e.target.value
-              )
-            }
-          >
-            <option value="">
-              -- Chọn giờ --
-            </option>
+      if (!id.includes(term) && !customer.includes(term) && !doctor.includes(term) && !typeStr.includes(term)) {
+        return false;
+      }
+    }
+    return true;
+  });
 
-            {SLOTS.map(
-              (slot) => {
-                const isTaken =
-                  takenTimes.has(
-                    slot
-                  );
+  const indexOfLastItem = currentPage * itemsPerPage;
+  const indexOfFirstItem = indexOfLastItem - itemsPerPage;
+  const currentItems = filteredAppointments.slice(indexOfFirstItem, indexOfLastItem);
+  const totalPages = Math.ceil(filteredAppointments.length / itemsPerPage);
 
-                return (
-                  <option
-                    key={slot}
-                    value={slot}
-                    disabled={
-                      isTaken
-                    }
-                  >
-                    {slot}{' '}
-                    {isTaken
-                      ? '(đã kín)'
-                      : ''}
-                  </option>
-                );
-              }
-            )}
-          </select>
-        </div>
+  const handlePageChange = (pageNumber) => {
+    setCurrentPage(pageNumber);
+  };
 
-        {/* Bác sĩ */}
-        <div className="col-md-6">
-          <label className="form-label">
-            Bác sĩ *
-          </label>
-
-          <select
-            className="form-select"
-            required
-            value={
-              selectedDoctor
-            }
-            onChange={(e) =>
-              setSelectedDoctor(
-                e.target.value
-              )
-            }
-          >
-            <option value="">
-              -- Chọn --
-            </option>
-
-            {filteredDoctors.map(
-              (doctor) => {
-                const id =
-                  doctor.IDBacSi ??
-                  doctor.id;
-
-                const name =
-                  doctor.TenBacSi ??
-                  doctor.doctorName ??
-                  doctor.name;
-
-                return (
-                  <option
-                    key={id}
-                    value={id}
-                  >
-                    {name} ({id})
-                  </option>
-                );
-              }
-            )}
-          </select>
-        </div>
-
-        {/* Đặt cho người khác */}
-        <div className="col-12">
-          <div className="form-check">
-            <input
-              type="checkbox"
-              id="forOther"
-              className="form-check-input"
-              checked={
-                forOther
-              }
-              onChange={(e) =>
-                setForOther(
-                  e.target.checked
-                )
-              }
-            />
-
-            <label
-              className="form-check-label"
-              htmlFor="forOther"
-            >
-              Đặt cho người khác
-            </label>
+  return (
+    <div className="bg-light min-vh-100 py-4">
+      <div className="container-fluid px-md-5">
+        <div className="d-flex justify-content-between align-items-center mb-4">
+          <div>
+            <h3 className="fw-bold mb-1" style={{ color: '#0b63e5' }}>Lịch hẹn của tôi</h3>
+            <p className="text-muted mb-0">Xem và quản lý các lịch hẹn đã đặt trên hệ thống.</p>
           </div>
         </div>
 
-        {!forOther && (
-          <div className="col-12">
-            <div className="row g-3 p-3 border rounded">
-              <div className="col-md-6">
-                <label className="form-label">
-                  Họ tên
-                </label>
+        {error && <div className="alert alert-danger shadow-sm">{error}</div>}
 
-                <input
-                  type="text"
-                  className="form-control"
-                  value={
-                    selfInfo.hoten
-                  }
-                  onChange={(e) =>
-                    setSelfInfo(
-                      {
-                        ...selfInfo,
-                        hoten:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
+        <div className="card border-0 shadow-sm rounded-3">
+          <div className="card-body p-4">
+            
+            <div className="row mb-4 g-3">
+              <div className="col-lg-4 col-md-6">
+                <div className="input-group">
+                  <span className="input-group-text bg-white text-muted border-end-0">
+                    <span role="img" aria-label="search">🔍</span>
+                  </span>
+                  <input
+                    type="text"
+                    className="form-control border-start-0 ps-0"
+                    placeholder="Tìm mã, bác sĩ, bệnh nhân..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                  />
+                </div>
               </div>
 
-              <div className="col-md-3">
-                <label className="form-label">
-                  SĐT
-                </label>
-
-                <input
-                  type="text"
-                  className="form-control"
-                  value={
-                    selfInfo.sdt
-                  }
-                  onChange={(e) =>
-                    setSelfInfo(
-                      {
-                        ...selfInfo,
-                        sdt:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-
-              <div className="col-md-3">
-                <label className="form-label">
-                  Giới tính
-                </label>
-
+              <div className="col-lg-3 col-md-6">
                 <select
-                  className="form-select"
-                  value={
-                    selfInfo.gioitinh
-                  }
-                  onChange={(e) =>
-                    setSelfInfo(
-                      {
-                        ...selfInfo,
-                        gioitinh:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
+                  className="form-select text-secondary"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
                 >
-                  <option value="">
-                    --
-                  </option>
-
-                  <option value="Nam">
-                    Nam
-                  </option>
-
-                  <option value="Nữ">
-                    Nữ
-                  </option>
-
-                  <option value="Khác">
-                    Khác
-                  </option>
+                  <option value="ALL">Tất cả trạng thái</option>
+                  <option value="pending">Đã đặt lịch</option>
+                  <option value="confirmed">Đã xác nhận</option>
+                  <option value="waiting">Chờ khám / Chờ XN</option>
+                  <option value="in_progress">Đang khám / Lấy mẫu</option>
+                  <option value="testing">Chờ kết quả</option>
+                  <option value="has_result">Đã có kết quả</option>
+                  <option value="completed">Hoàn thành</option>
+                  <option value="cancelled">Đã hủy / Bỏ lượt</option>
                 </select>
               </div>
 
-              <div className="col-md-4">
-                <label className="form-label">
-                  Ngày sinh
-                </label>
-
-                <input
-                  type="date"
-                  className="form-control"
-                  value={
-                    selfInfo.ngaysinh
-                  }
-                  onChange={(e) =>
-                    setSelfInfo(
-                      {
-                        ...selfInfo,
-                        ngaysinh:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-
-              <div className="col-md-8">
-                <label className="form-label">
-                  Email nhận thông
-                  tin
-                </label>
-
-                <input
-                  type="email"
-                  className="form-control"
-                  placeholder="..."
-                  value={
-                    selfInfo.email
-                  }
-                  onChange={(e) =>
-                    setSelfInfo(
-                      {
-                        ...selfInfo,
-                        email:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
+              <div className="col-lg-5 col-md-12">
+                <div className="input-group">
+                  <span className="input-group-text bg-light text-muted">Từ</span>
+                  <input
+                    type="date"
+                    className="form-control text-secondary"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                  />
+                  <span className="input-group-text bg-light text-muted border-start-0 border-end-0">đến</span>
+                  <input
+                    type="date"
+                    className="form-control text-secondary"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                  />
+                </div>
               </div>
             </div>
+
+            {loading ? (
+              <div className="text-center py-5 text-secondary">
+                <div className="spinner-border text-primary mb-2" role="status"></div>
+                <div>Đang tải lịch hẹn...</div>
+              </div>
+            ) : filteredAppointments.length === 0 ? (
+              <div className="text-center py-5 text-muted">Chưa có lịch hẹn phù hợp.</div>
+            ) : (
+              <>
+                <div className="table-responsive">
+                  <table className="table table-hover align-middle mb-0" style={{ fontSize: '0.95rem' }}>
+                    <thead className="table-light">
+                      <tr>
+                        <th className="text-center text-nowrap">#</th>
+                        <th className="text-nowrap">Mã Đặt Lịch</th>
+                        <th className="text-nowrap">Ngày</th>
+                        <th className="text-nowrap">Giờ</th>
+                        <th>Phân loại</th>
+                        <th>Bệnh nhân</th>
+                        <th>Bác sĩ</th>
+                        <th className="text-center text-nowrap">Trạng thái</th>
+                        <th className="text-center text-nowrap">Thao tác</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {currentItems.map((item, index) => (
+                        <tr key={item.id || index}>
+                          <td className="text-center text-muted">
+                            {indexOfFirstItem + index + 1}
+                          </td>
+                          <td className="text-nowrap"><strong className="text-dark">{item.id}</strong></td>
+                          <td className="text-nowrap">{formatDate(item.appointmentDate)}</td>
+                          <td className="text-nowrap">{item.appointmentTime ? String(item.appointmentTime).substring(0, 5) : '—'}</td>
+                          <td>
+                            {item.type === 'EXAMINATION' ? (
+                              <span className="text-primary fw-medium">Khám bệnh</span>
+                            ) : (
+                              <span className="text-success fw-medium">Xét nghiệm</span>
+                            )}
+                          </td>
+                          <td>{item.customerName || '—'}</td>
+                          <td>{item.doctorName || '—'}</td>
+                          <td className="text-center text-nowrap">{renderStatusBadge(item.status)}</td>
+                          <td className="text-center text-nowrap">
+                            <Link
+                              className="btn btn-sm btn-outline-primary rounded-pill px-3"
+                              to={`/lich-hen/${item.id}`}
+                            >
+                              Chi tiết
+                            </Link>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {totalPages > 1 && (
+                  <div className="d-flex justify-content-between align-items-center mt-4">
+                    <span className="text-muted small">
+                      Hiển thị {indexOfFirstItem + 1} - {Math.min(indexOfLastItem, filteredAppointments.length)} trong tổng số {filteredAppointments.length} lịch hẹn
+                    </span>
+                    <nav>
+                      <ul className="pagination pagination-sm mb-0">
+                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                          <button 
+                            className="page-link" 
+                            onClick={() => handlePageChange(1)}
+                            disabled={currentPage === 1}
+                            title="Về trang đầu"
+                          >
+                            &laquo;
+                          </button>
+                        </li>
+
+                        <li className={`page-item ${currentPage === 1 ? 'disabled' : ''}`}>
+                          <button 
+                            className="page-link" 
+                            onClick={() => handlePageChange(currentPage - 1)}
+                            disabled={currentPage === 1}
+                            title="Trang trước"
+                          >
+                            &lsaquo;
+                          </button>
+                        </li>
+                        
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                          <li key={page} className={`page-item ${currentPage === page ? 'active' : ''}`}>
+                            <button className="page-link" onClick={() => handlePageChange(page)}>
+                              {page}
+                            </button>
+                          </li>
+                        ))}
+
+                        <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                          <button 
+                            className="page-link" 
+                            onClick={() => handlePageChange(currentPage + 1)}
+                            disabled={currentPage === totalPages}
+                            title="Trang sau"
+                          >
+                            &rsaquo;
+                          </button>
+                        </li>
+
+                        <li className={`page-item ${currentPage === totalPages ? 'disabled' : ''}`}>
+                          <button 
+                            className="page-link" 
+                            onClick={() => handlePageChange(totalPages)}
+                            disabled={currentPage === totalPages}
+                            title="Về trang cuối"
+                          >
+                            &raquo;
+                          </button>
+                        </li>
+                      </ul>
+                    </nav>
+                  </div>
+                )}
+              </>
+            )}
           </div>
-        )}
-
-        {forOther && (
-          <div className="col-12">
-            <div className="row g-3 p-3 border rounded">
-              <div className="col-md-6">
-                <label className="form-label">
-                  Họ tên người khám *
-                </label>
-
-                <input
-                  type="text"
-                  className="form-control"
-                  required
-                  value={
-                    otherInfo.p_name
-                  }
-                  onChange={(e) =>
-                    setOtherInfo(
-                      {
-                        ...otherInfo,
-                        p_name:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-
-              <div className="col-md-3">
-                <label className="form-label">
-                  SĐT *
-                </label>
-
-                <input
-                  type="text"
-                  className="form-control"
-                  required
-                  value={
-                    otherInfo.p_phone
-                  }
-                  onChange={(e) =>
-                    setOtherInfo(
-                      {
-                        ...otherInfo,
-                        p_phone:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-
-              <div className="col-md-3">
-                <label className="form-label">
-                  Giới tính *
-                </label>
-
-                <select
-                  className="form-select"
-                  value={
-                    otherInfo.p_gender
-                  }
-                  onChange={(e) =>
-                    setOtherInfo(
-                      {
-                        ...otherInfo,
-                        p_gender:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                >
-                  <option value="">
-                    --
-                  </option>
-
-                  <option value="Nam">
-                    Nam
-                  </option>
-
-                  <option value="Nữ">
-                    Nữ
-                  </option>
-
-                  <option value="Khác">
-                    Khác
-                  </option>
-                </select>
-              </div>
-
-              <div className="col-md-4">
-                <label className="form-label">
-                  Ngày sinh
-                </label>
-
-                <input
-                  type="date"
-                  className="form-control"
-                  value={
-                    otherInfo.p_dob
-                  }
-                  onChange={(e) =>
-                    setOtherInfo(
-                      {
-                        ...otherInfo,
-                        p_dob:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-
-              <div className="col-md-8">
-                <label className="form-label">
-                  Email nhận thông
-                  tin *
-                </label>
-
-                <input
-                  type="email"
-                  className="form-control"
-                  required
-                  value={
-                    otherInfo.p_email
-                  }
-                  onChange={(e) =>
-                    setOtherInfo(
-                      {
-                        ...otherInfo,
-                        p_email:
-                          e.target
-                            .value,
-                      }
-                    )
-                  }
-                />
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Ghi chú */}
-        <div className="col-12">
-          <label className="form-label">
-            Ghi chú
-          </label>
-
-          <textarea
-            rows="2"
-            className="form-control"
-            placeholder="Yêu cầu thêm (nếu có)"
-            value={note}
-            onChange={(e) =>
-              setNote(
-                e.target.value
-              )
-            }
-          />
         </div>
-
-        <div className="col-12">
-          <button
-            type="submit"
-            className="btn btn-primary"
-            disabled={loading}
-            style={{
-              backgroundColor:
-                'var(--primary, #0b63e5)',
-
-              borderColor:
-                'var(--primary, #0b63e5)',
-            }}
-          >
-            {loading
-              ? 'Đang xử lý...'
-              : 'Xác nhận'}
-          </button>
-        </div>
-      </form>
+      </div>
     </div>
   );
 }

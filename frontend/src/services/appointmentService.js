@@ -43,13 +43,15 @@ export const createQuickAppointment = async (payload) => {
   return unwrap(response);
 };
 
+// ĐÃ SỬA ĐƯỜNG DẪN Ở ĐÂY
 export const createExaminationAppointment = async (payload) => {
-  const response = await api.post('/appointments/examination', payload);
+  const response = await api.post('/appointments/examinations', payload);
   return unwrap(response);
 };
 
+// ĐÃ SỬA ĐƯỜNG DẪN Ở ĐÂY
 export const createTestAppointment = async (payload) => {
-  const response = await api.post('/appointments/testing', payload);
+  const response = await api.post('/appointments/tests', payload);
   return unwrap(response);
 };
 export const createTestingAppointment = createTestAppointment;
@@ -145,6 +147,15 @@ export const getAvailableDoctors = async (params = {}) => {
 export const getSpecialties = async (params = {}) => {
   const response = await api.get('/specialties', { params });
   return unwrap(response);
+};
+
+export const getAppointmentDetail = async (id) => {
+  try {
+    const response = await api.get(`/appointments/${id}`);
+    return response.data;
+  } catch (error) {
+    throw error;
+  }
 };
 
 // --- ALIASES ---

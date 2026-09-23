@@ -1,89 +1,83 @@
 package com.biomedic.backend.entity;
 
+import jakarta.persistence.*;
 import java.time.LocalDateTime;
 
-/**
- * Domain model cho tài khoản đăng nhập. Dự kiến tương ứng bảng users.
- *
- * IMPORTANT: Đây là domain model compile-safe.
- * Chưa gắn @Entity/@Table/@Column để tránh map sai schema MySQL hiện tại.
- */
+@Entity
+@Table(name = "users")
 public class Account {
 
-    private String id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "UserID")
+    private Integer userId;
+
+    @Column(name = "Username", unique = true)
     private String username;
+
+    @Column(name = "Email", unique = true, nullable = false)
     private String email;
+
+    @Column(name = "PasswordHash", nullable = false)
     private String passwordHash;
-    private Role role;
-    private String status;
+
+    // Map trực tiếp chuỗi ENUM từ DB: 'khachhang','bacsi','letan','ktv','admin'
+    @Column(name = "Role", nullable = false)
+    private String role;
+
+    @Column(name = "IDKhachHang")
+    private String idKhachHang;
+
+    @Column(name = "IDBacSi")
+    private Integer idBacSi;
+
+    @Column(name = "IDNhanVien")
+    private String idNhanVien;
+
+    @Column(name = "IsActive", nullable = false)
+    private Boolean isActive = true;
+
+    @Column(name = "CreatedAt", insertable = false, updatable = false)
     private LocalDateTime createdAt;
-    private LocalDateTime lastLoginAt;
+
+    @Column(name = "UpdatedAt", insertable = false, updatable = false)
+    private LocalDateTime updatedAt;
 
     public Account() {
     }
 
-    public String getId() {
-        return id;
-    }
+    // --- GETTERS AND SETTERS ---
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public Integer getUserId() { return userId; }
+    public void setUserId(Integer userId) { this.userId = userId; }
 
-    public String getUsername() {
-        return username;
-    }
+    public String getUsername() { return username; }
+    public void setUsername(String username) { this.username = username; }
 
-    public void setUsername(String username) {
-        this.username = username;
-    }
+    public String getEmail() { return email; }
+    public void setEmail(String email) { this.email = email; }
 
-    public String getEmail() {
-        return email;
-    }
+    public String getPasswordHash() { return passwordHash; }
+    public void setPasswordHash(String passwordHash) { this.passwordHash = passwordHash; }
 
-    public void setEmail(String email) {
-        this.email = email;
-    }
+    public String getRole() { return role; }
+    public void setRole(String role) { this.role = role; }
 
-    public String getPasswordHash() {
-        return passwordHash;
-    }
+    public String getIdKhachHang() { return idKhachHang; }
+    public void setIdKhachHang(String idKhachHang) { this.idKhachHang = idKhachHang; }
 
-    public void setPasswordHash(String passwordHash) {
-        this.passwordHash = passwordHash;
-    }
+    public Integer getIdBacSi() { return idBacSi; }
+    public void setIdBacSi(Integer idBacSi) { this.idBacSi = idBacSi; }
 
-    public Role getRole() {
-        return role;
-    }
+    public String getIdNhanVien() { return idNhanVien; }
+    public void setIdNhanVien(String idNhanVien) { this.idNhanVien = idNhanVien; }
 
-    public void setRole(Role role) {
-        this.role = role;
-    }
+    public Boolean getIsActive() { return isActive; }
+    public void setIsActive(Boolean isActive) { this.isActive = isActive; }
 
-    public String getStatus() {
-        return status;
-    }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
 
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
-
-    public LocalDateTime getLastLoginAt() {
-        return lastLoginAt;
-    }
-
-    public void setLastLoginAt(LocalDateTime lastLoginAt) {
-        this.lastLoginAt = lastLoginAt;
-    }
-
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public void setUpdatedAt(LocalDateTime updatedAt) { this.updatedAt = updatedAt; }
 }

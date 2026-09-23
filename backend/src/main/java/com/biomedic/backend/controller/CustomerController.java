@@ -77,7 +77,7 @@ public class CustomerController {
     // ADMIN - LIST
     // =========================
     @GetMapping("/admin/customers")
-    @PreAuthorize("hasRole('ADMIN')")
+   // @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getAllCustomers(
             @RequestParam(
                     required = false

@@ -3,95 +3,64 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
 
-import { getWaitingQueue } from '../../services/appointmentService';
+// IMPORT service mới
+import visitService from '../../services/visitService';
 import { getApiErrorMessage } from '../../services/api';
 
+// Map lại với trường dữ liệu backend trả về
 const normalizeQueueItem = (item = {}) => ({
-  id:
-    item.id ??
-    item.idLuotKham ??
-    item.IDLuotKham ??
-    item.idLuotXetNghiem ??
-    item.IDLuotXetNghiem,
-
-  code:
-    item.code ??
-    item.maLuot ??
-    item.MaLuot ??
-    '—',
-
-  queueNumber:
-    item.queueNumber ??
-    item.soThuTu ??
-    item.SoThuTu,
-
-  patientName:
-    item.patientName ??
-    item.tenKhachHang ??
-    item.TenKhachHang ??
-    '—',
-
-  service:
-    item.service ??
-    item.serviceName ??
-    item.dichVu ??
-    item.tenDichVu ??
-    '—',
-
-  room:
-    item.room ??
-    item.roomName ??
-    item.tenPhong ??
-    item.TenPhong ??
-    '—',
-
-  checkInTime:
-    item.checkInTime ??
-    item.thoiGianCheckIn ??
-    item.ThoiGianCheckIn ??
-    '—',
-
-  status:
-    item.status ??
-    item.trangThai ??
-    item.TrangThai ??
-    'WAITING',
+  id: item.maLuot || item.id || Math.random().toString(), // Dùng mã lượt làm ID tạm
+  code: item.maLuot || '—',
+  queueNumber: item.stt || '—',
+  patientName: item.tenNguoiBenh || '—',
+  service: item.dichVu || '—',
+  room: item.phong || '—',
+  checkInTime: item.checkInTime || '—',
+  status: item.trangThai || 'WAITING',
 });
 
 const statusText = (status) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'WAITING':
+  switch (String(status || '').toLowerCase()) {
+    case 'da_tiep_nhan':
+      return 'Đã tiếp nhận';
+    case 'cho_kham':
+      return 'Chờ khám';
+    case 'cho_xet_nghiem':
+      return 'Chờ xét nghiệm';
+    case 'waiting':
       return 'Đang chờ';
-
-    case 'CALLED':
+    case 'called':
       return 'Đã gọi';
-
-    case 'EXAMINING':
+    case 'examining':
+    case 'dang_kham':
       return 'Đang khám';
-
-    case 'TESTING':
-      return 'Đang xét nghiệm';
-
-    case 'COMPLETED':
+    case 'testing':
+    case 'dang_lay_mau':
+      return 'Đang lấy mẫu';
+    case 'completed':
+    case 'hoan_tat':
       return 'Hoàn tất';
-
     default:
       return status || 'Chưa xác định';
   }
 };
 
 const statusClass = (status) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'CALLED':
-      return 'bg-warning-subtle text-warning-emphasis';
-
-    case 'EXAMINING':
-    case 'TESTING':
+  switch (String(status || '').toLowerCase()) {
+    case 'da_tiep_nhan':
       return 'bg-primary-subtle text-primary';
-
-    case 'COMPLETED':
+    case 'cho_kham':
+    case 'cho_xet_nghiem':
+    case 'called':
+      return 'bg-warning-subtle text-warning-emphasis';
+    case 'examining':
+    case 'testing':
+    case 'dang_kham':
+    case 'dang_lay_mau':
+      return 'bg-info-subtle text-info-emphasis';
+    case 'completed':
+    case 'hoan_tat':
       return 'bg-success-subtle text-success';
-
     default:
       return 'bg-secondary-subtle text-secondary';
   }
@@ -103,26 +72,20 @@ export default function DanhSachCho() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const loadQueue = async (
-    showLoading = true
-  ) => {
+  const loadQueue = async (showLoading = true) => {
     try {
       if (showLoading) {
         setLoading(true);
       }
 
-      const data = await getWaitingQueue();
+      // SỬ DỤNG visitService GỌI API MỚI
+      const data = await visitService.getReceptionWaitingList('ALL');
 
       const list = Array.isArray(data)
         ? data
-        : data?.content ||
-          data?.items ||
-          data?.data ||
-          [];
+        : data?.content || data?.items || data?.data || [];
 
-      setQueue(
-        list.map(normalizeQueueItem)
-      );
+      setQueue(list.map(normalizeQueueItem));
     } catch (err) {
       setError(
         getApiErrorMessage(
@@ -173,7 +136,7 @@ export default function DanhSachCho() {
     <div>
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
-          <h1 className="dashboard-page-title mb-1">
+          <h1 className="dashboard-page-title mb-1" style={{ color: 'var(--primary, #0d6efd)' }}>
             Danh sách chờ
           </h1>
 
@@ -184,7 +147,7 @@ export default function DanhSachCho() {
 
         <button
           type="button"
-          className="btn btn-outline-primary"
+          className="btn btn-outline-primary bg-white fw-medium"
           onClick={() => loadQueue()}
           disabled={loading}
         >
@@ -210,13 +173,13 @@ export default function DanhSachCho() {
                 maxWidth: 520,
               }}
             >
-              <span className="input-group-text bg-white">
+              <span className="input-group-text bg-white border-end-0">
                 <i className="fa-solid fa-magnifying-glass text-secondary" />
               </span>
 
               <input
                 type="search"
-                className="form-control"
+                className="form-control border-start-0 ps-0"
                 placeholder="Tìm mã lượt, tên người bệnh, dịch vụ..."
                 value={keyword}
                 onChange={(e) =>
@@ -236,55 +199,36 @@ export default function DanhSachCho() {
             <Loading text="Đang tải hàng chờ..." />
           ) : (
             <div className="table-responsive">
-              <table className="table table-hover align-middle">
-                <thead className="table-light">
+              <table className="table table-borderless table-hover align-middle mb-0">
+                <thead className="border-bottom" style={{ backgroundColor: '#fdfdfd' }}>
                   <tr>
-                    <th style={{ width: 85 }}>
+                    <th className="py-3" style={{ width: 85 }}>
                       STT
                     </th>
-
-                    <th>
-                      Mã lượt
-                    </th>
-
-                    <th>
-                      Người bệnh
-                    </th>
-
-                    <th>
-                      Dịch vụ
-                    </th>
-
-                    <th>
-                      Phòng
-                    </th>
-
-                    <th>
-                      Check-in
-                    </th>
-
-                    <th>
-                      Trạng thái
-                    </th>
+                    <th className="py-3">Mã lượt</th>
+                    <th className="py-3">Người bệnh</th>
+                    <th className="py-3">Dịch vụ</th>
+                    <th className="py-3">Phòng</th>
+                    <th className="py-3">Check-in</th>
+                    <th className="py-3">Trạng thái</th>
                   </tr>
                 </thead>
 
                 <tbody>
                   {filteredQueue.length > 0 ? (
                     filteredQueue.map((item, index) => (
-                      <tr key={item.id ?? index}>
+                      <tr key={item.id} className="border-bottom">
                         <td>
-                          <span className="badge bg-primary fs-6">
-                            {item.queueNumber ??
-                              index + 1}
+                          <span className="fw-bold fs-6">
+                            {item.queueNumber}
                           </span>
                         </td>
 
-                        <td className="fw-semibold">
+                        <td className="fw-semibold text-primary">
                           {item.code}
                         </td>
 
-                        <td>
+                        <td className="fw-bold">
                           {item.patientName}
                         </td>
 
@@ -302,9 +246,7 @@ export default function DanhSachCho() {
 
                         <td>
                           <span
-                            className={`badge ${statusClass(
-                              item.status
-                            )}`}
+                            className={`badge ${statusClass(item.status)} px-2 py-1`}
                           >
                             {statusText(item.status)}
                           </span>

@@ -1,34 +1,62 @@
 package com.biomedic.backend.entity;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+
 import java.time.LocalDateTime;
 
-/**
- * Domain model thông báo. Dự kiến tương ứng bảng thongbao.
- *
- * IMPORTANT: Đây là domain model compile-safe.
- * Chưa gắn @Entity/@Table/@Column để tránh map sai schema MySQL hiện tại.
- */
+@Entity
+@Table(name = "thongbao")
 public class Notification {
 
-    private String id;
-    private String customerId;
-    private String accountId;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "IDThongBao")
+    private Long id; // DB là bigint AUTO_INCREMENT nên đổi sang Long
+    
+    @Transient
+    private String customerId; // Cột này không có trong DB nên phải dùng @Transient để Hibernate bỏ qua
+
+    @Column(name = "UserIDNhan")
+    private Integer accountId; // DB là int nên đổi sang Integer
+
+    @Column(name = "LoaiThongBao")
     private String type;
+
+    @Column(name = "TieuDe")
     private String title;
+
+    @Column(name = "NoiDung")
     private String content;
+
+    @Column(name = "IDDoiTuong")
     private String objectId;
+
+    @Column(name = "LoaiDoiTuong")
     private String objectType;
+
+    @Column(name = "ThoiGianTao", insertable = false, updatable = false)
     private LocalDateTime createdAt;
+    
+    @Column(name = "DaDoc")
     private boolean read;
+
+    @Column(name = "ThoiGianDoc")
+    private LocalDateTime readAt; // Bổ sung cột ThoiGianDoc có trong DB
 
     public Notification() {
     }
 
-    public String getId() {
+    public Long getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Long id) {
         this.id = id;
     }
 
@@ -40,11 +68,11 @@ public class Notification {
         this.customerId = customerId;
     }
 
-    public String getAccountId() {
+    public Integer getAccountId() {
         return accountId;
     }
 
-    public void setAccountId(String accountId) {
+    public void setAccountId(Integer accountId) {
         this.accountId = accountId;
     }
 
@@ -104,4 +132,11 @@ public class Notification {
         this.read = read;
     }
 
+    public LocalDateTime getReadAt() {
+        return readAt;
+    }
+
+    public void setReadAt(LocalDateTime readAt) {
+        this.readAt = readAt;
+    }
 }

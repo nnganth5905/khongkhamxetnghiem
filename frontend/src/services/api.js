@@ -11,7 +11,8 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('biomedic_access_token');
+    // Ưu tiên lấy token chuẩn của app
+    const token = localStorage.getItem('biomedic_access_token') || localStorage.getItem('accessToken');
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -31,11 +32,25 @@ api.interceptors.response.use(
     const isAuthEndpoint =
       url.includes('/auth/login') ||
       url.includes('/auth/register') ||
+      url.includes('/auth/logout') ||
       url.includes('/auth/forgot-password') ||
       url.includes('/auth/reset-password');
 
+    // NẾU BỊ LỖI XÁC THỰC (401), CHỈ DỌN SẠCH STORAGE VÀ BÁO CHO REACT
     if (status === 401 && !isAuthEndpoint) {
       localStorage.removeItem('biomedic_access_token');
+      localStorage.removeItem('biomedic_user');
+      localStorage.removeItem('accessToken');
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      localStorage.removeItem('role');
+      
+      // Bắn event để React (AuthContext) nhận biết và tự cập nhật giao diện (Xóa avatar, hiện nút Đăng nhập)
+      window.dispatchEvent(new Event('auth-change'));
+      
+      // ĐÃ XÓA: window.location.href = '/login';
+      // Việc điều hướng bây giờ hoàn toàn do hàm navigate('/') trong Header.jsx quyết định, 
+      // không bị api.js phá bĩnh nữa!
     }
 
     return Promise.reject(error);

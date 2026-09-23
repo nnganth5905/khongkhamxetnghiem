@@ -131,6 +131,7 @@ import QuanLyChuyenKhoa from '../pages/admin/QuanLyChuyenKhoa';
 import QuanLyPhong from '../pages/admin/QuanLyPhong';
 import QuanLyLichLamViec from '../pages/admin/QuanLyLichLamViec';
 import BaoCaoThongKe from '../pages/admin/BaoCaoThongKe';
+import QuanLyLichHen from '../pages/admin/QuanLyLichHen';
 
 // DASHBOARDS
 import AdminDashboard from '../pages/dashboard/AdminDashboard';
@@ -492,8 +493,9 @@ export default function AppRoutes() {
             element={<LichHen />}
           />
 
+          {/* CHỈ CẦN DÒNG NÀY CHO TRANG CHI TIẾT */}
           <Route
-            path="/lich-hen/chi-tiet"
+            path="/lich-hen/:id"
             element={<LichHenChiTiet />}
           />
 
@@ -725,6 +727,10 @@ export default function AppRoutes() {
             path="/tracking/lich-su"
             element={<LichSuTruyVet />}
           />
+
+          
+          <Route path="/admin/lich-hen" element={<QuanLyLichHen />} />
+
         </Route>
       </Route>
 

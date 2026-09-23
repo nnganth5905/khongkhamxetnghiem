@@ -21,10 +21,14 @@ export const getAuthErrorMessage = getApiErrorMessage;
 
 // --- QUẢN LÝ PHIÊN ĐĂNG NHẬP / CLIENT STATE ---
 export const clearAuthSession = () => {
+  // Xóa toàn bộ tàn dư của các bộ key khác nhau
+  localStorage.removeItem('biomedic_access_token');
+  localStorage.removeItem('biomedic_user');
+  localStorage.removeItem('accessToken');
   localStorage.removeItem('token');
   localStorage.removeItem('user');
-  localStorage.removeItem('auth');
   localStorage.removeItem('role');
+  localStorage.removeItem('auth');
   sessionStorage.clear();
 };
 

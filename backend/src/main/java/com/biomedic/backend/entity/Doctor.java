@@ -1,34 +1,74 @@
 package com.biomedic.backend.entity;
 
-/**
- * Domain model bác sĩ. Dự kiến tương ứng bảng bacsi và liên hệ với nhanvien.
- *
- * IMPORTANT: Đây là domain model compile-safe.
- * Chưa gắn @Entity/@Table/@Column để tránh map sai schema MySQL hiện tại.
- */
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+import jakarta.persistence.Transient;
+
+@Entity
+@Table(name = "bacsi")
 public class Doctor {
 
-    private String id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "IDBacSi")
+    private Integer id; // Khớp DB (AUTO_INCREMENT)
+
+    @Column(name = "IDNhanVien")
     private String employeeId;
+
+    @Column(name = "KhoaID")
     private String specialtyId;
-    private String roomId;
+
+    @Column(name = "CoSoID")
+    private String roomId; 
+
+    @Column(name = "HocVi")
     private String degree;
+
+    @Column(name = "ChucDanh")
     private String title;
-    private String phone;
-    private String email;
+
+    @Column(name = "TenBacSi")
+    private String name; 
+
+    @Column(name = "HinhAnh")
     private String imageUrl;
+
+    @Column(name = "MoTa")
     private String bio;
+
+    @Column(name = "TrangThai", columnDefinition = "ENUM('active','inactive') DEFAULT 'active'")
     private String status;
+
+    // Sử dụng @Transient để EntityMapper lấy được dữ liệu 
+    // nhưng Hibernate sẽ không cố mapping chúng vào database bảng "bacsi"
+    @Transient
+    private String phone;
+
+    @Transient
+    private String email;
 
     public Doctor() {
     }
 
-    public String getId() {
+    public Integer getId() {
         return id;
     }
 
-    public void setId(String id) {
+    public void setId(Integer id) {
         this.id = id;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
     }
 
     public String getEmployeeId() {
@@ -71,22 +111,6 @@ public class Doctor {
         this.title = title;
     }
 
-    public String getPhone() {
-        return phone;
-    }
-
-    public void setPhone(String phone) {
-        this.phone = phone;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public void setEmail(String email) {
-        this.email = email;
-    }
-
     public String getImageUrl() {
         return imageUrl;
     }
@@ -111,4 +135,19 @@ public class Doctor {
         this.status = status;
     }
 
+    public String getPhone() {
+        return phone;
+    }
+
+    public void setPhone(String phone) {
+        this.phone = phone;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
 }

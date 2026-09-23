@@ -8,6 +8,7 @@ public record AppointmentResponse(
         String type,
         String customerId,
         String customerName,
+        String customerPhone, // Bổ sung trường số điện thoại
         String doctorId,
         String doctorName,
         LocalDate appointmentDate,

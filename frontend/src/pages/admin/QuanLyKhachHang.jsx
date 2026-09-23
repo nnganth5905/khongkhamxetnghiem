@@ -1,7 +1,5 @@
 import React from 'react';
-
 import AdminCrudPage from '../../components/admin/AdminCrudPage';
-
 import {
   getCustomers,
   createCustomer,
@@ -13,52 +11,33 @@ const columns = [
   {
     key: 'maKhachHang',
     label: 'Mã KH',
-    value: (row) =>
-      row.maKhachHang ??
-      row.MaKhachHang ??
-      row.idKhachHang ??
-      row.IDKhachHang,
+    value: (row) => row.maKhachHang ?? row.id,
   },
   {
     key: 'hoTen',
     label: 'Họ và tên',
-    value: (row) =>
-      row.hoTen ??
-      row.HoTen ??
-      row.fullName ??
-      row.FullName,
+    value: (row) => row.hoTen ?? row.fullName,
   },
   {
     key: 'soDienThoai',
     label: 'Số điện thoại',
-    value: (row) =>
-      row.soDienThoai ??
-      row.SoDienThoai ??
-      row.phone,
+    value: (row) => row.soDienThoai ?? row.phone,
   },
   {
     key: 'email',
     label: 'Email',
-    value: (row) =>
-      row.email ??
-      row.Email,
+    value: (row) => row.email,
   },
   {
     key: 'gioiTinh',
     label: 'Giới tính',
-    value: (row) =>
-      row.gioiTinh ??
-      row.GioiTinh,
+    value: (row) => row.gioiTinh,
   },
   {
     key: 'trangThai',
     label: 'Trạng thái',
     type: 'status',
-    value: (row) =>
-      row.trangThai ??
-      row.TrangThai ??
-      row.status ??
-      'ACTIVE',
+    value: (row) => row.trangThai ?? 'ACTIVE',
   },
 ];
 
@@ -92,18 +71,9 @@ const fields = [
     label: 'Giới tính',
     type: 'select',
     options: [
-      {
-        value: 'Nam',
-        label: 'Nam',
-      },
-      {
-        value: 'Nữ',
-        label: 'Nữ',
-      },
-      {
-        value: 'Khác',
-        label: 'Khác',
-      },
+      { value: 'Nam', label: 'Nam' },
+      { value: 'Nữ', label: 'Nữ' },
+      { value: 'Khác', label: 'Khác' },
     ],
     colClass: 'col-md-3',
   },
@@ -118,14 +88,8 @@ const fields = [
     type: 'select',
     defaultValue: 'ACTIVE',
     options: [
-      {
-        value: 'ACTIVE',
-        label: 'Hoạt động',
-      },
-      {
-        value: 'INACTIVE',
-        label: 'Ngừng hoạt động',
-      },
+      { value: 'ACTIVE', label: 'Hoạt động' },
+      { value: 'INACTIVE', label: 'Ngừng hoạt động' },
     ],
     colClass: 'col-md-4',
   },
@@ -150,11 +114,8 @@ export default function QuanLyKhachHang() {
       createItem={createCustomer}
       updateItem={updateCustomer}
       deleteItem={deleteCustomer}
-      itemId={(row) =>
-        row.id ??
-        row.idKhachHang ??
-        row.IDKhachHang
-      }
+      idKey="id"
+      itemId={(row) => row.id ?? row.maKhachHang}
       searchPlaceholder="Tìm theo mã khách hàng, họ tên, số điện thoại, email..."
       addButtonText="Thêm khách hàng"
       formTitleCreate="Thêm khách hàng"

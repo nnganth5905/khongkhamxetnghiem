@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getAppointments, checkInAppointment } from '../../services/appointmentService';
 
-export default function CheckIn() {
+export default function QuanLyLichHen() {
     const [appointments, setAppointments] = useState([]);
     const [loading, setLoading] = useState(false);
     
@@ -82,7 +82,7 @@ export default function CheckIn() {
         <div className="container-fluid p-4" style={{ backgroundColor: '#f8f9fa', minHeight: '100vh' }}>
             <div className="d-flex flex-column flex-md-row justify-content-between align-items-md-end mb-4">
                 <div className="mb-3 mb-md-0">
-                    <h2 className="fw-bold mb-1" style={{ color: 'var(--primary, #0d6efd)' }}>Tiếp nhận & Check-in</h2>
+                    <h2 className="fw-bold mb-1" style={{ color: 'var(--primary, #0d6efd)' }}>Quản lý lịch hẹn</h2>
                     <p className="text-secondary mb-0">Xem danh sách đặt lịch và tiến hành check-in khi khách hàng tới cơ sở.</p>
                 </div>
                 <div className="d-flex gap-2">
@@ -168,22 +168,22 @@ export default function CheckIn() {
                                             </td>
                                             <td>
                                                 {apt.status === 'pending' && <span className="badge bg-warning text-dark px-2 py-1">Chờ xác nhận</span>}
-                                                {apt.status === 'confirmed' && <span className="badge bg-primary px-2 py-1">Đã xác nhận</span>}
+
                                                 {apt.status === 'checked_in' && <span className="badge bg-success px-2 py-1">Đã check-in</span>}
                                                 {apt.status === 'cancelled' && <span className="badge bg-danger px-2 py-1">Đã hủy</span>}
                                                 {apt.status === 'huy' && <span className="badge bg-danger px-2 py-1">Đã hủy</span>}
                                             </td>
                                             <td className="text-end">
-                                                {(apt.status === 'pending' || apt.status === 'confirmed') && (
-                                                    <button 
-                                                        className="btn btn-outline-success rounded-pill px-2 py-1"
-                                                        style={{ fontSize: '0.75rem', lineHeight: '1.2' }}
-                                                        onClick={() => handleCheckIn(apt.id, apt.type)}
-                                                    >
-                                                        <i className="fa-solid fa-check me-1"></i> Check-in
-                                                    </button>
-                                                )}
-                                            </td>
+    {(apt.status === 'pending' || apt.status === 'confirmed') && (
+        <button 
+            className="btn btn-outline-success rounded-pill px-2 py-1"
+            style={{ fontSize: '0.75rem', lineHeight: '1.2' }}
+            onClick={() => handleCheckIn(apt.id, apt.type)}
+        >
+            <i className="fa-solid fa-check me-1"></i> Check-in
+        </button>
+    )}
+</td>
                                         </tr>
                                     ))
                                 )}
@@ -191,6 +191,7 @@ export default function CheckIn() {
                         </table>
                     </div>
 
+                    {/* Điều hướng phân trang */}
                     {totalPages > 0 && (
                         <div className="d-flex justify-content-between align-items-center pt-3 border-top">
                             <span className="text-muted small">
@@ -227,6 +228,7 @@ export default function CheckIn() {
                             </nav>
                         </div>
                     )}
+
                 </div>
             </div>
         </div>

@@ -1,45 +1,22 @@
 package com.biomedic.backend.repository;
 
 import com.biomedic.backend.entity.Account;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
-import java.util.List;
 import java.util.Optional;
 
-/**
- * Compile-safe repository contract cho Account.
- *
- * Chưa extends JpaRepository vì Account hiện chưa được map @Entity
- * theo schema thật của bảng users.
- */
-public interface AccountRepository {
+@Repository
+public interface AccountRepository extends JpaRepository<Account, Integer> {
 
-    Optional<Account> findById(
-            String id
-    );
+    Optional<Account> findByUsername(String username);
 
-    Optional<Account> findByUsername(
-            String username
-    );
+    Optional<Account> findByEmail(String email);
 
-    Optional<Account> findByEmail(
-            String email
-    );
+    Optional<Account> findByIdBacSi(Integer idBacSi);
 
-    List<Account> findAll();
+    boolean existsByUsername(String username);
 
-    boolean existsByUsername(
-            String username
-    );
-
-    boolean existsByEmail(
-            String email
-    );
-
-    Account save(
-            Account account
-    );
-
-    void deleteById(
-            String id
-    );
+    boolean existsByEmail(String email);
+    
 }

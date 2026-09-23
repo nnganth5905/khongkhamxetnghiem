@@ -83,11 +83,13 @@ public class AppointmentController {
     @PostMapping("/tests")
     public ResponseEntity<?> createTestAppointment(
             @RequestBody
-            TestAppointmentRequest request
+            TestAppointmentRequest request,
+            Authentication authentication
     ) {
         Object created =
                 appointmentService.createTestAppointment(
-                        request
+                        request,
+                        authentication
                 );
 
         return ResponseEntity
@@ -98,11 +100,13 @@ public class AppointmentController {
     @PostMapping("/examinations")
     public ResponseEntity<?> createExaminationAppointment(
             @RequestBody
-            ExaminationAppointmentRequest request
+            ExaminationAppointmentRequest request,
+            Authentication authentication
     ) {
         Object created =
                 appointmentService.createExaminationAppointment(
-                        request
+                        request,
+                        authentication
                 );
 
         return ResponseEntity
@@ -121,16 +125,31 @@ public class AppointmentController {
         );
     }
 
+    // THÊM VÀO GIỮA CÁC ĐƯỜNG DẪN GET HIỆN TẠI
+    @GetMapping
+    public ResponseEntity<?> getAllAppointments(@RequestParam(required = false) LocalDate date) {
+        if (date == null) date = LocalDate.now();
+        return ResponseEntity.ok(appointmentService.getAllAppointments(date));
+    }
+
+    @PostMapping("/{id}/check-in")
+    public ResponseEntity<?> checkInAppointment(@PathVariable String id, @RequestBody java.util.Map<String, String> payload) {
+        String type = payload.get("type"); 
+        return ResponseEntity.ok(appointmentService.checkInAppointmentAdmin(id, type));
+    }
+
+// Thêm đoạn này vào TRƯỚC @GetMapping("/{id}")
+    @GetMapping("/waiting-queue")
+    public ResponseEntity<?> getWaitingQueue() {
+        // Tạm thời trả về danh sách rỗng để Frontend không bị lỗi hiển thị
+        // (Sau này bạn có thể viết thêm logic lấy hàng đợi vào AppointmentService)
+        return ResponseEntity.ok(java.util.Collections.emptyList());
+    }
+
+
     @GetMapping("/{id}")
-    public ResponseEntity<?> getAppointmentDetail(
-            @PathVariable
-            String id
-    ) {
-        return ResponseEntity.ok(
-                appointmentService.getAppointmentDetail(
-                        id
-                )
-        );
+    public ResponseEntity<?> getAppointmentDetail(@PathVariable String id) {
+        return ResponseEntity.ok(appointmentService.getAppointmentDetail(id));
     }
 
     @PutMapping("/{id}")
@@ -183,6 +202,8 @@ public class AppointmentController {
             String hoten,
             String email,
             String sodienthoai,
+            String gioitinh, // Đã bổ sung
+            String ngaysinh, // Đã bổ sung
             String ngay,
             String gio,
             String idbacsi,
@@ -196,6 +217,8 @@ public class AppointmentController {
             String hoten,
             String email,
             String sodienthoai,
+            String gioitinh, // Đã bổ sung
+            String ngaysinh, // Đã bổ sung
             String ngay,
             String gio,
             String idbacsi,

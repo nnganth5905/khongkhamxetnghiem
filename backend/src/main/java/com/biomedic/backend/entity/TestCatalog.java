@@ -1,116 +1,72 @@
 package com.biomedic.backend.entity;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import java.math.BigDecimal;
 
-/**
- * Domain model danh mục xét nghiệm. Database hiện tại có loaixetnghiem/chisoxetnghiem/nguongchisoxetnghiem.
- *
- * IMPORTANT: Đây là domain model compile-safe.
- * Chưa gắn @Entity/@Table/@Column để tránh map sai schema MySQL hiện tại.
- */
+@Entity
+@Table(name = "loaixetnghiem")
 public class TestCatalog {
 
+    @Id
+    @Column(name = "IDXetNghiem")
     private String id;
+
+    @Column(name = "TenXetNghiem")
     private String name;
-    private String description;
+
+    @Column(name = "ChuyenKhoaID")
     private String categoryId;
+
+    @Column(name = "Loai")
     private String testType;
-    private String specimenType;
-    private String unit;
-    private String referenceValue;
+
+    @Column(name = "MoTa")
+    private String description;
+
+    @Column(name = "Gia")
     private BigDecimal price;
-    private String turnaroundTime;
-    private String status;
+
+    @Column(name = "LoaiMauMacDinh")
+    private String defaultSampleType;
+
+    @Column(name = "ThoiGianDuKienPhut")
+    private Integer estimatedTimeMinutes;
+
+    @Column(name = "Status")
+    private String status = "yes";
 
     public TestCatalog() {
     }
 
-    public String getId() {
-        return id;
-    }
+    // --- GETTERS AND SETTERS ---
 
-    public void setId(String id) {
-        this.id = id;
-    }
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
 
-    public String getName() {
-        return name;
-    }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
 
-    public void setName(String name) {
-        this.name = name;
-    }
+    public String getCategoryId() { return categoryId; }
+    public void setCategoryId(String categoryId) { this.categoryId = categoryId; }
 
-    public String getDescription() {
-        return description;
-    }
+    public String getTestType() { return testType; }
+    public void setTestType(String testType) { this.testType = testType; }
 
-    public void setDescription(String description) {
-        this.description = description;
-    }
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-    public String getCategoryId() {
-        return categoryId;
-    }
+    public BigDecimal getPrice() { return price; }
+    public void setPrice(BigDecimal price) { this.price = price; }
 
-    public void setCategoryId(String categoryId) {
-        this.categoryId = categoryId;
-    }
+    public String getDefaultSampleType() { return defaultSampleType; }
+    public void setDefaultSampleType(String defaultSampleType) { this.defaultSampleType = defaultSampleType; }
 
-    public String getTestType() {
-        return testType;
-    }
+    public Integer getEstimatedTimeMinutes() { return estimatedTimeMinutes; }
+    public void setEstimatedTimeMinutes(Integer estimatedTimeMinutes) { this.estimatedTimeMinutes = estimatedTimeMinutes; }
 
-    public void setTestType(String testType) {
-        this.testType = testType;
-    }
-
-    public String getSpecimenType() {
-        return specimenType;
-    }
-
-    public void setSpecimenType(String specimenType) {
-        this.specimenType = specimenType;
-    }
-
-    public String getUnit() {
-        return unit;
-    }
-
-    public void setUnit(String unit) {
-        this.unit = unit;
-    }
-
-    public String getReferenceValue() {
-        return referenceValue;
-    }
-
-    public void setReferenceValue(String referenceValue) {
-        this.referenceValue = referenceValue;
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public void setPrice(BigDecimal price) {
-        this.price = price;
-    }
-
-    public String getTurnaroundTime() {
-        return turnaroundTime;
-    }
-
-    public void setTurnaroundTime(String turnaroundTime) {
-        this.turnaroundTime = turnaroundTime;
-    }
-
-    public String getStatus() {
-        return status;
-    }
-
-    public void setStatus(String status) {
-        this.status = status;
-    }
-
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 }

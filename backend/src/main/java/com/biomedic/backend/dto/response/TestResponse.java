@@ -8,11 +8,9 @@ public record TestResponse(
         String description,
         String categoryId,
         String testType,
-        String specimenType,
-        String unit,
-        String referenceValue,
+        String defaultSampleType, // Đổi tên cho khớp Entity
         BigDecimal price,
-        String turnaroundTime,
+        Integer estimatedTimeMinutes, // Đổi tên cho khớp Entity
         String status
 ) {
 }

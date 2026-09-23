@@ -31,14 +31,15 @@ public final class EntityMapper {
         }
 
         return new UserResponse(
-                account.getId(),
+                // Ép kiểu Integer userId sang String để không lỗi DTO cũ
+                account.getUserId() != null ? String.valueOf(account.getUserId()) : null,
                 account.getUsername(),
                 account.getEmail(),
                 null,
-                account.getRole() != null
-                        ? account.getRole().name()
-                        : null,
-                account.getStatus()
+                // Role bây giờ là String nên không cần gọi .name()
+                account.getRole(),
+                // Chuyển đổi IsActive (Boolean) sang Status (String)
+                account.getIsActive() != null && account.getIsActive() ? "active" : "inactive"
         );
     }
 
@@ -71,9 +72,10 @@ public final class EntityMapper {
         }
 
         return new DoctorResponse(
-                doctor.getId(),
+                // Chuyển Integer id sang String
+                doctor.getId() != null ? String.valueOf(doctor.getId()) : null,
                 doctor.getEmployeeId(),
-                null,
+                doctor.getName(), // Đã sửa từ null thành doctor.getName() ở bước trước
                 doctor.getSpecialtyId(),
                 null,
                 doctor.getRoomId(),
@@ -123,11 +125,9 @@ public final class EntityMapper {
                 test.getDescription(),
                 test.getCategoryId(),
                 test.getTestType(),
-                test.getSpecimenType(),
-                test.getUnit(),
-                test.getReferenceValue(),
+                test.getDefaultSampleType(),
                 test.getPrice(),
-                test.getTurnaroundTime(),
+                test.getEstimatedTimeMinutes(),
                 test.getStatus()
         );
     }
@@ -164,20 +164,17 @@ public final class EntityMapper {
 
         return new TestResultResponse(
                 result.getId(),
-                result.getTestOrderId(),
-                result.getTestOrderItemId(),
+                result.getIdCtPhieu(),
                 result.getSpecimenId(),
                 result.getTechnicianId(),
                 result.getResultValue(),
-                result.getUnit(),
-                result.getReferenceRange(),
                 result.getComment(),
                 result.getPerformedAt(),
+                result.getCompletedAt(),
                 result.getEnteredAt(),
                 result.getApprovedByDoctorId(),
                 result.getApprovedAt(),
                 result.getConclusion(),
-                result.getAdvice(),
                 result.getStatus()
         );
     }
@@ -190,7 +187,7 @@ public final class EntityMapper {
         }
 
         return new NotificationResponse(
-                notification.getId(),
+                String.valueOf(notification.getId()), // ĐÃ SỬA: Ép kiểu Long sang String
                 notification.getType(),
                 notification.getTitle(),
                 notification.getContent(),

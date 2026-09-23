@@ -59,9 +59,13 @@ export default function Login() {
         password: formData.password,
       });
 
-      const destination =
-        location.state?.from ||
-        getRoleHome(data?.user?.role);
+      let destination = location.state?.from;
+
+      // Bỏ qua nếu "from" là trang chủ hoặc trang đăng nhập, bắt buộc điều hướng theo Role
+      if (!destination || destination === '/' || destination === '/login') {
+        // Lấy trực tiếp data.role đã được AuthContext xử lý trả ra
+        destination = getRoleHome(data?.role);
+      }
 
       navigate(destination, {
         replace: true,

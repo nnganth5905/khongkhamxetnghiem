@@ -188,7 +188,7 @@ export default function CustomerDashboard() {
                   </div>
 
                   <Link
-                    to="/lich-hen"
+                    to={data.upcomingAppointment.id ? `/lich-hen/${data.upcomingAppointment.id}` : "/lich-hen"}
                     className="btn btn-outline-primary"
                   >
                     Xem lịch hẹn

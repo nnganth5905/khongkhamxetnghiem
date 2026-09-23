@@ -470,23 +470,16 @@ export default function Sidebar({
       );
     };
 
-  const handleLogout =
-    () => {
-      clearAuthSession();
+  const handleLogout = () => {
+    // 1. Xóa session/token trong localStorage/cookies
+    clearAuthSession();
 
-      window.dispatchEvent(
-        new Event(
-          'auth-change'
-        )
-      );
+    // 2. Kích hoạt event (nếu cần cho các component khác)
+    window.dispatchEvent(new Event('auth-change'));
 
-      navigate(
-        '/login',
-        {
-          replace: true,
-        }
-      );
-    };
+    // 3. Ép trình duyệt tải lại toàn bộ ứng dụng và đưa về trang chủ gốc (public)
+    window.location.href = '/'; 
+  };
 
   return (
     <aside

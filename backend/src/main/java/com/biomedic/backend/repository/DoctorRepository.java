@@ -1,36 +1,13 @@
 package com.biomedic.backend.repository;
 
 import com.biomedic.backend.entity.Doctor;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
 
 import java.util.List;
-import java.util.Optional;
 
-public interface DoctorRepository {
-
-    Optional<Doctor> findById(
-            String id
-    );
-
-    Optional<Doctor> findByEmployeeId(
-            String employeeId
-    );
-
-    List<Doctor> findAll();
-
-    List<Doctor> findBySpecialtyId(
-            String specialtyId
-    );
-
-    List<Doctor> search(
-            String specialtyId,
-            String keyword
-    );
-
-    Doctor save(
-            Doctor doctor
-    );
-
-    void deleteById(
-            String id
-    );
+@Repository
+public interface DoctorRepository extends JpaRepository<Doctor, Integer> {
+    // Tìm các bác sĩ đang hoạt động
+    List<Doctor> findByStatus(String status);
 }

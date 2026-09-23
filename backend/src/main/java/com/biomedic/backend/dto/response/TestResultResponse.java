@@ -4,20 +4,17 @@ import java.time.LocalDateTime;
 
 public record TestResultResponse(
         String id,
-        String testOrderId,
-        String testOrderItemId,
+        Long idCtPhieu,
         String specimenId,
         String technicianId,
         String resultValue,
-        String unit,
-        String referenceRange,
         String comment,
         LocalDateTime performedAt,
+        LocalDateTime completedAt,
         LocalDateTime enteredAt,
-        String approvedByDoctorId,
+        Integer approvedByDoctorId,
         LocalDateTime approvedAt,
         String conclusion,
-        String advice,
         String status
 ) {
 }
