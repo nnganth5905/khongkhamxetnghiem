@@ -106,37 +106,7 @@ public class TestResultController {
         );
     }
 
-    // =========================
-    // DOCTOR
-    // =========================
-    @PostMapping("/doctor/results/{id}/approve")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<?> approveResult(
-            @PathVariable
-            String id
-    ) {
-        return ResponseEntity.ok(
-                testResultService.approveResult(id)
-        );
-    }
-
-    @PostMapping("/doctor/results/{id}/conclude")
-    @PreAuthorize("hasRole('DOCTOR')")
-    public ResponseEntity<?> concludeResult(
-            @PathVariable
-            String id,
-
-            @RequestBody
-            ConclusionRequest request
-    ) {
-        return ResponseEntity.ok(
-                testResultService.concludeResult(
-                        id,
-                        request.conclusion(),
-                        request.advice()
-                )
-        );
-    }
+    // ĐÃ XÓA PHẦN DOCTOR Ở ĐÂY ĐỂ TRÁNH XUNG ĐỘT VỚI DOCTORCONTROLLER
 
     public record LookupRequest(
             @NotBlank
@@ -161,12 +131,6 @@ public class TestResultController {
             String unit,
             String referenceRange,
             Boolean abnormal
-    ) {
-    }
-
-    public record ConclusionRequest(
-            String conclusion,
-            String advice
     ) {
     }
 }
