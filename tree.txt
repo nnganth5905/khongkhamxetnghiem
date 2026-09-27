@@ -1,0 +1,562 @@
+// src/routes/AppRoutes.jsx
+import React from 'react';
+import {
+  Navigate,
+  Route,
+  Routes,
+} from 'react-router-dom';
+
+import ProtectedRoute from '../components/ProtectedRoute';
+
+import MainLayout from '../layouts/MainLayout';
+import AdminLayout from '../layouts/AdminLayout';
+import DoctorLayout from '../layouts/DoctorLayout';
+import CustomerLayout from '../layouts/CustomerLayout';
+import ReceptionistLayout from '../layouts/ReceptionistLayout';
+import TechnicianLayout from '../layouts/TechnicianLayout';
+
+import {
+  getRoleHome,
+  useAuth,
+} from '../context/AuthContext';
+
+// HOME
+import Home from '../pages/home/Home';
+import HomeAlt from '../pages/home/HomeAlt';
+
+// ABOUT
+import About1 from '../pages/about/About1';
+import About2 from '../pages/about/About2';
+
+// AUTH
+import Login from '../pages/auth/Login';
+import Register from '../pages/auth/Register';
+import ForgotPassword from '../pages/auth/ForgotPassword';
+import ResetPassword from '../pages/auth/ResetPassword';
+import Confirm from '../pages/auth/Confirm';
+
+// APPOINTMENT
+import Book from '../pages/appointment/Book';
+import DatLich from '../pages/appointment/DatLich';
+import DatLichKham from '../pages/appointment/DatLichKham';
+import DatLichXetNghiem from '../pages/appointment/DatLichXetNghiem';
+import LichHen from '../pages/appointment/LichHen';
+import LichHenChiTiet from '../pages/appointment/LichHenChiTiet';
+import LichHenSua from '../pages/appointment/LichHenSua';
+
+// DOCTOR
+import BacSiTQ from '../pages/doctor/BacSiTQ';
+import GioLamViec from '../pages/doctor/GioLamViec';
+import DoctorDanhSachCho from '../pages/doctor/DanhSachCho';
+import KhamBenh from '../pages/doctor/KhamBenh';
+import ChiDinhXetNghiem from '../pages/doctor/ChiDinhXetNghiem';
+import LayMau from '../pages/doctor/LayMau';
+import BanGiaoMau from '../pages/doctor/BanGiaoMau';
+import DuyetKetQua from '../pages/doctor/DuyetKetQua';
+import DocKetQua from '../pages/doctor/DocKetQua';
+
+// TECHNICIAN
+import DanhSachMau from '../pages/technician/DanhSachMau';
+import TiepNhanMau from '../pages/technician/TiepNhanMau';
+import ThucHienXetNghiem from '../pages/technician/ThucHienXetNghiem';
+import NhapKetQua from '../pages/technician/NhapKetQua';
+
+// RECEPTION
+import CheckIn from '../pages/reception/CheckIn';
+import CheckInQR from '../pages/reception/CheckInQR';
+import ReceptionDanhSachCho from '../pages/reception/DanhSachCho';
+import QuanLyTiepNhan from '../pages/reception/QuanLyTiepNhan';
+
+// TRACKING
+import TheoDoiLuotKham from '../pages/tracking/TheoDoiLuotKham';
+import TheoDoiXetNghiem from '../pages/tracking/TheoDoiXetNghiem';
+import LichSuTruyVet from '../pages/tracking/LichSuTruyVet';
+
+// NOTIFICATION
+import ThongBao from '../pages/notification/ThongBao';
+
+// TEST / RESULT
+import KetQua from '../pages/test/KetQua';
+import ChiTietKetQua from '../pages/test/ChiTietKetQua';
+import ChiTietXetNghiemKDN from '../pages/test/ChiTietXetNghiemKDN';
+import TraCuuXnoKDN from '../pages/test/TraCuuXnoKDN';
+import TestFinal from '../pages/test/TestFinal';
+
+// TEST CATEGORIES
+import BloodClot from '../pages/testCategories/BloodClot';
+import Hematology from '../pages/testCategories/Hematology';
+import HighUp from '../pages/testCategories/HighUp';
+import Hormones from '../pages/testCategories/Hormones';
+import Kidney from '../pages/testCategories/Kidney';
+import Lipid from '../pages/testCategories/Lipid';
+import Tumor from '../pages/testCategories/Tumor';
+import Urine from '../pages/testCategories/Urine';
+import Virus from '../pages/testCategories/Virus';
+
+// MEDICAL
+import Medical from '../pages/medical/Medical';
+import MedicalArticle from '../pages/medical/MedicalArticle';
+import Handbook from '../pages/medical/Handbook';
+import QuyTrinh from '../pages/medical/QuyTrinh';
+
+// NEWS
+import NewsADN from '../pages/news/NewsADN';
+import NewsCovid from '../pages/news/NewsCovid';
+import NewsTimMach from '../pages/news/NewsTimMach';
+import NewsVoucher from '../pages/news/NewsVoucher';
+import NewsXetNghiem from '../pages/news/NewsXetNghiem';
+
+// PROMOTION
+import Promotions from '../pages/promotion/Promotions';
+import PromotionDetail from '../pages/promotion/PromotionDetail';
+
+// SERVICES
+import Services from '../pages/services/Services';
+
+// SOCIAL
+import Social from '../pages/social/Social';
+import SocialArticle from '../pages/social/SocialArticle';
+
+// SEARCH / CONTACT
+import TimKiem from '../pages/search/TimKiem';
+import LienHe from '../pages/contact/LienHe';
+
+// ADMIN
+import QuanLyKhachHang from '../pages/admin/QuanLyKhachHang';
+import QuanLyNhanVien from '../pages/admin/QuanLyNhanVien';
+import QuanLyBacSi from '../pages/admin/QuanLyBacSi';
+import QuanLyKTV from '../pages/admin/QuanLyKTV';
+import QuanLyXetNghiem from '../pages/admin/QuanLyXetNghiem';
+import QuanLyChuyenKhoa from '../pages/admin/QuanLyChuyenKhoa';
+import QuanLyPhong from '../pages/admin/QuanLyPhong';
+import QuanLyLichLamViec from '../pages/admin/QuanLyLichLamViec';
+import BaoCaoThongKe from '../pages/admin/BaoCaoThongKe';
+import QuanLyLichHen from '../pages/admin/QuanLyLichHen';
+
+// DASHBOARDS
+import AdminDashboard from '../pages/dashboard/AdminDashboard';
+import DoctorDashboard from '../pages/dashboard/DoctorDashboard';
+import CustomerDashboard from '../pages/dashboard/CustomerDashboard';
+import ReceptionistDashboard from '../pages/dashboard/ReceptionistDashboard';
+import TechnicianDashboard from '../pages/dashboard/TechnicianDashboard';
+
+const ALL_ROLES = [
+  'ADMIN',
+  'DOCTOR',
+  'CUSTOMER',
+  'RECEPTIONIST',
+  'TECHNICIAN',
+];
+
+function DashboardRedirect() {
+  const {
+    role,
+    loading,
+    isAuthenticated,
+  } = useAuth();
+
+  if (loading) {
+    return null;
+  }
+
+  if (!isAuthenticated) {
+    return (
+      
+    );
+  }
+
+  return (
+    
+  );
+}
+
+export default function AppRoutes() {
+  return (
+    
+      {/* =====================================================
+          AUTH ROUTES (ĐỘC LẬP - KHÔNG BỊ BỌC BỞI LAYOUT NÀO)
+      ====================================================== */}
+      }
+      />
+
+      }
+      />
+
+      }
+      />
+
+      
+        }
+      />
+
+      }
+      />
+
+      }
+      />
+
+      {/* =====================================================
+          PUBLIC WEBSITE (GIAO DIỆN CHUNG MAINLAYOUT)
+      ====================================================== */}
+      }>
+        }
+        />
+
+        }
+        />
+
+        {/* ABOUT */}
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* APPOINTMENT */}
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* DOCTOR PUBLIC */}
+        }
+        />
+
+        }
+        />
+
+        {/* SERVICES */}
+        }
+        />
+
+        
+          }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* TEST CATEGORIES */}
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* MEDICAL */}
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* NEWS */}
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        }
+        />
+
+        {/* PROMOTION */}
+        }
+        />
+
+        }
+        />
+
+        {/* SOCIAL */}
+        }
+        />
+
+        }
+        />
+
+        {/* SEARCH / CONTACT */}
+        }
+        />
+
+        }
+        />
+
+        {/* PUBLIC RESULT LOOKUP */}
+        }
+        />
+
+        {/* AUTHENTICATED COMMON PAGES */}
+        
+          }
+        >
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+        
+      
+
+      {/* =====================================================
+          CUSTOMER
+      ====================================================== */}
+      
+        }
+      >
+        }>
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+        
+      
+
+      {/* DOCTOR / ADMIN internal result view */}
+      
+        }
+      >
+        }
+        />
+      
+
+      {/* =====================================================
+          DOCTOR
+      ====================================================== */}
+      
+        }
+      >
+        }>
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+        
+      
+
+      {/* =====================================================
+          RECEPTIONIST
+      ====================================================== */}
+      
+        }
+      >
+        }>
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+        
+      
+
+      {/* =====================================================
+          TECHNICIAN
+      ====================================================== */}
+      
+        }
+      >
+        }>
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+        
+      
+
+      {/* =====================================================
+          ADMIN
+      ====================================================== */}
+      
+        }
+      >
+        }>
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          }
+          />
+
+          {/* CÁC ĐƯỜNG DẪN KẾT QUẢ CHO ADMIN */}
+          }
+          />
+          }
+          />
+          }
+          />
+          }
+          />
+
+          {/* CÁC ĐƯỜNG DẪN THEO DÕI CHO ADMIN */}
+          }
+          />
+          }
+          />
+          }
+          />
+          }
+          />
+          }
+          />
+          }
+          />
+          }
+          />
+        
+      
+
+      {/* =====================================================
+          ROLE REDIRECT
+      ====================================================== */}
+      }
+      />
+
+      
+        }
+      />
+
+      
+        }
+      />
+
+      
+        }
+      />
+
+      {/* NOT FOUND */}
+      
+        }
+      />
+    
+  );
+}

@@ -1,0 +1,6 @@
+@BioMedic.Backend_HostAddress = http://localhost:5195
+
+GET {{BioMedic.Backend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
