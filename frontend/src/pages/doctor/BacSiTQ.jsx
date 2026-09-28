@@ -94,8 +94,15 @@ const getDoctorDescription = (doctor) =>
 
 const getDoctorSpecialty = (doctor) =>
   doctor?.KhoaID ??
+  doctor?.KhoaId ??
+  doctor?.khoaID ??
   doctor?.khoaId ??
+  doctor?.ChuyenKhoaID ??
+  doctor?.ChuyenKhoaId ??
+  doctor?.chuyenKhoaID ??
+  doctor?.chuyenKhoaId ??
   doctor?.specialtyId ??
+  doctor?.SpecialtyId ??
   '';
 
 const getDoctorStars = (doctor) => {
@@ -449,9 +456,16 @@ export default function BacSiTQ() {
           )
         ),
 
+        // Gửi thêm 'khoa' để các trang đặt lịch cũ/mới đều đọc được.
+        khoa: String(
+          getDoctorSpecialty(
+            doctor
+          )
+        ),
+
         date,
 
-        time,
+        time: String(time).substring(0, 5),
       });
 
     if (type === 'visit') {

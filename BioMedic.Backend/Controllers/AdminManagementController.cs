@@ -54,12 +54,206 @@ public class AdminManagementController : ControllerBase
     [HttpPost("employees")]
     public async Task<IActionResult> CreateEmployee([FromBody] EmployeeAdminRequest r)
     {
-        if (string.IsNullOrWhiteSpace(r.Name) || string.IsNullOrWhiteSpace(r.Position)) return BadRequest(new { message = "Thiếu họ tên hoặc vị trí." });
-        var id = NewCode("NV"); var x = new Nhanvien { IdnhanVien = id, TenNhanVien = r.Name.Trim(), ViTri = r.Position.Trim(), SoDienThoai = Clean(r.Phone), Email = Clean(r.Email), CoSoId = Clean(r.FacilityId), Status = r.Status ?? "yes", CreatedAt = DateTime.Now }; _context.Nhanviens.Add(x); await _context.SaveChangesAsync(); return Ok(new { id, success = true });
+        if (string.IsNullOrWhiteSpace(r.Name))
+            return BadRequest(new { success = false, message = "Họ tên không được để trống." });
+
+        var position = NormalizeEmployeePosition(r.Position);
+        if (position is null)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Vai trò không hợp lệ. Chỉ chấp nhận: bacsi, letan, ktv, admin, dieu_duong, khac."
+            });
+        }
+
+        var status = NormalizeYesNo(r.Status);
+        if (status is null)
+        {
+            return BadRequest(new
+            {
+                success = false,
+                message = "Trạng thái không hợp lệ. Chỉ chấp nhận yes hoặc no."
+            });
+        }
+
+        var facilityId = Clean(r.FacilityId);
+        if (!string.IsNullOrWhiteSpace(facilityId))
+        {
+            var facilityExists = await _context.Cosos
+                .AsNoTracking()
+                .AnyAsync(x => x.CoSoId == facilityId);
+
+            if (!facilityExists)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = $"Mã cơ sở '{facilityId}' không tồn tại."
+                });
+            }
+        }
+
+        var email = Clean(r.Email);
+        if (!string.IsNullOrWhiteSpace(email))
+        {
+            email = email.ToLowerInvariant();
+
+            var duplicateEmail = await _context.Nhanviens
+                .AsNoTracking()
+                .AnyAsync(x => x.Email == email);
+
+            if (duplicateEmail)
+            {
+                return Conflict(new
+                {
+                    success = false,
+                    message = "Email này đã được sử dụng cho một nhân viên khác."
+                });
+            }
+        }
+
+        var id = NewCode("NV");
+
+        var employee = new Nhanvien
+        {
+            IdnhanVien = id,
+            TenNhanVien = r.Name.Trim(),
+            ViTri = position,
+            SoDienThoai = Clean(r.Phone),
+            Email = email,
+            CoSoId = facilityId,
+            Status = status,
+            CreatedAt = DateTime.Now
+        };
+
+        try
+        {
+            _context.Nhanviens.Add(employee);
+            await _context.SaveChangesAsync();
+
+            return Ok(new
+            {
+                id,
+                success = true,
+                message = "Thêm nhân viên thành công."
+            });
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                success = false,
+                message = "Không thể thêm nhân viên vào cơ sở dữ liệu.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
     }
 
     [HttpPut("employees/{id}")]
-    public async Task<IActionResult> UpdateEmployee(string id, [FromBody] EmployeeAdminRequest r) { var x = await _context.Nhanviens.FindAsync(id); if (x is null) return NotFound(); if (!string.IsNullOrWhiteSpace(r.Name)) x.TenNhanVien = r.Name.Trim(); if (!string.IsNullOrWhiteSpace(r.Position)) x.ViTri = r.Position.Trim(); x.SoDienThoai = Clean(r.Phone) ?? x.SoDienThoai; x.Email = Clean(r.Email) ?? x.Email; x.CoSoId = Clean(r.FacilityId) ?? x.CoSoId; x.Status = r.Status ?? x.Status; await _context.SaveChangesAsync(); return Ok(new { success = true }); }
+    public async Task<IActionResult> UpdateEmployee(string id, [FromBody] EmployeeAdminRequest r)
+    {
+        var employee = await _context.Nhanviens.FindAsync(id);
+        if (employee is null)
+            return NotFound(new { success = false, message = "Không tìm thấy nhân viên." });
+
+        if (!string.IsNullOrWhiteSpace(r.Name))
+            employee.TenNhanVien = r.Name.Trim();
+
+        if (!string.IsNullOrWhiteSpace(r.Position))
+        {
+            var position = NormalizeEmployeePosition(r.Position);
+            if (position is null)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Vai trò không hợp lệ. Chỉ chấp nhận: bacsi, letan, ktv, admin, dieu_duong, khac."
+                });
+            }
+
+            employee.ViTri = position;
+        }
+
+        if (r.Phone is not null)
+            employee.SoDienThoai = Clean(r.Phone);
+
+        if (r.Email is not null)
+        {
+            var email = Clean(r.Email)?.ToLowerInvariant();
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                var duplicateEmail = await _context.Nhanviens
+                    .AsNoTracking()
+                    .AnyAsync(x => x.IdnhanVien != id && x.Email == email);
+
+                if (duplicateEmail)
+                {
+                    return Conflict(new
+                    {
+                        success = false,
+                        message = "Email này đã được sử dụng cho một nhân viên khác."
+                    });
+                }
+            }
+
+            employee.Email = email;
+        }
+
+        if (r.FacilityId is not null)
+        {
+            var facilityId = Clean(r.FacilityId);
+
+            if (!string.IsNullOrWhiteSpace(facilityId))
+            {
+                var facilityExists = await _context.Cosos
+                    .AsNoTracking()
+                    .AnyAsync(x => x.CoSoId == facilityId);
+
+                if (!facilityExists)
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = $"Mã cơ sở '{facilityId}' không tồn tại."
+                    });
+                }
+            }
+
+            employee.CoSoId = facilityId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(r.Status))
+        {
+            var status = NormalizeYesNo(r.Status);
+            if (status is null)
+            {
+                return BadRequest(new
+                {
+                    success = false,
+                    message = "Trạng thái không hợp lệ. Chỉ chấp nhận yes hoặc no."
+                });
+            }
+
+            employee.Status = status;
+        }
+
+        try
+        {
+            await _context.SaveChangesAsync();
+            return Ok(new { success = true, message = "Cập nhật nhân viên thành công." });
+        }
+        catch (DbUpdateException ex)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, new
+            {
+                success = false,
+                message = "Không thể cập nhật nhân viên.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
+    }
 
     [HttpDelete("employees/{id}")]
     public async Task<IActionResult> DeleteEmployee(string id) { var x = await _context.Nhanviens.FindAsync(id); if (x is null) return NotFound(); x.Status = "no"; await _context.SaveChangesAsync(); return Ok(new { success = true }); }
@@ -121,6 +315,40 @@ public class AdminManagementController : ControllerBase
     public async Task<IActionResult> UpdateSchedule(ulong id, [FromBody] ScheduleAdminRequest r) { var x = await _context.Lichlamviecs.FindAsync(id); if (x is null) return NotFound(); x.IdbacSi = r.DoctorId; x.Idphong = Clean(r.RoomId) ?? x.Idphong; x.Ngay = r.Date; x.Ca = r.Shift; x.GioBatDau = r.Start; x.GioKetThuc = r.End; x.TrangThai = r.Status ?? x.TrangThai; x.GhiChu = Clean(r.Note) ?? x.GhiChu; x.UpdatedAt = DateTime.Now; await _context.SaveChangesAsync(); return Ok(new { success = true }); }
     [HttpDelete("work-schedules/{id}")]
     public async Task<IActionResult> DeleteSchedule(ulong id) { var x = await _context.Lichlamviecs.FindAsync(id); if (x is null) return NotFound(); _context.Lichlamviecs.Remove(x); await _context.SaveChangesAsync(); return Ok(new { success = true }); }
+
+    private static string? NormalizeEmployeePosition(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return null;
+
+        var input = value.Trim().ToLowerInvariant();
+
+        return input switch
+        {
+            "bacsi" or "doctor" or "bác sĩ" or "bac si" => "bacsi",
+            "letan" or "receptionist" or "lễ tân" or "le tan" => "letan",
+            "ktv" or "technician" or "kỹ thuật viên" or "ky thuat vien" => "ktv",
+            "admin" or "administrator" or "quản trị viên" or "quan tri vien" => "admin",
+            "dieu_duong" or "nurse" or "điều dưỡng" or "dieu duong" => "dieu_duong",
+            "khac" or "staff" or "nhân viên" or "nhan vien" => "khac",
+            _ => null
+        };
+    }
+
+    private static string? NormalizeYesNo(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return "yes";
+
+        var input = value.Trim().ToLowerInvariant();
+
+        return input switch
+        {
+            "yes" or "active" or "1" or "true" or "đang làm việc" or "dang lam viec" => "yes",
+            "no" or "inactive" or "0" or "false" or "ngừng làm việc" or "ngung lam viec" => "no",
+            _ => null
+        };
+    }
 
     private static string NewCode(string prefix) => (prefix + Guid.NewGuid().ToString("N")[..8]).ToUpperInvariant();
     private static string? Clean(string? v) => string.IsNullOrWhiteSpace(v) ? null : v.Trim();

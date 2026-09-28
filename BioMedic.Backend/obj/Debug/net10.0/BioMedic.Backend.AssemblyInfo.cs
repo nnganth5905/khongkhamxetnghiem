@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("BioMedic.Backend")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+ad6ba027c503321ff1119d2610a2e8a17e922c4e")]
 [assembly: System.Reflection.AssemblyProductAttribute("BioMedic.Backend")]
 [assembly: System.Reflection.AssemblyTitleAttribute("BioMedic.Backend")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

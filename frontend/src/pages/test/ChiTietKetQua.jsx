@@ -1,12 +1,5 @@
-import React, {
-  useEffect,
-  useState,
-} from 'react';
-
-import {
-  Link,
-  useParams,
-} from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
 
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
@@ -14,31 +7,33 @@ import Notification from '../../components/Notification';
 import { getResult } from '../../services/testService';
 import { getApiErrorMessage } from '../../services/api';
 
-const formatValue = (value) => {
-  if (
-    value === null ||
-    value === undefined ||
-    value === ''
-  ) {
-    return '—';
+const show = (value) =>
+  value === null || value === undefined || value === ''
+    ? '—'
+    : value;
+
+const formatDate = (value) => {
+  if (!value) return '—';
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
   }
 
-  return value;
+  return date.toLocaleString('vi-VN');
 };
 
 export default function ChiTietKetQua() {
   const { resultId } = useParams();
 
-  const queryId =
-    new URLSearchParams(
-      window.location.search
-    ).get('id');
+  const queryId = new URLSearchParams(
+    window.location.search
+  ).get('id');
 
-  const id =
-    resultId || queryId;
+  const id = resultId || queryId;
 
   const [result, setResult] = useState(null);
-
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -47,17 +42,13 @@ export default function ChiTietKetQua() {
 
     const loadResult = async () => {
       if (!id) {
-        setError(
-          'Thiếu mã kết quả xét nghiệm.'
-        );
-
+        setError('Thiếu mã kết quả xét nghiệm.');
         setLoading(false);
         return;
       }
 
       try {
-        const data =
-          await getResult(id);
+        const data = await getResult(id);
 
         if (active) {
           setResult(data);
@@ -97,13 +88,23 @@ export default function ChiTietKetQua() {
     result?.details ??
     [];
 
+  const doctorName =
+    result?.examiningDoctorName ??
+    result?.doctorName ??
+    result?.tenBacSi ??
+    result?.TenBacSi;
+
+  const approvedDoctorName =
+    result?.approvedDoctorName ??
+    result?.doctorApprovedName ??
+    result?.tenBacSiDuyet ??
+    result?.TenBacSiDuyet;
+
   return (
     <div className="bg-light min-vh-100 py-5">
       <div
         className="container"
-        style={{
-          maxWidth: 1000,
-        }}
+        style={{ maxWidth: 1000 }}
       >
         {error && (
           <Notification
@@ -118,10 +119,7 @@ export default function ChiTietKetQua() {
               <div>
                 <h1
                   className="fw-bold mb-1"
-                  style={{
-                    color:
-                      'var(--primary)',
-                  }}
+                  style={{ color: 'var(--primary)' }}
                 >
                   Chi tiết kết quả
                 </h1>
@@ -135,9 +133,9 @@ export default function ChiTietKetQua() {
               </div>
 
               <Link
-  to="/admin/ket-qua"
-  className="btn btn-outline-secondary"
->
+                to="/customer/ket-qua"
+                className="btn btn-outline-secondary"
+              >
                 <i className="fa-solid fa-arrow-left me-2" />
                 Quay lại
               </Link>
@@ -150,12 +148,12 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Người bệnh
                     </div>
-
                     <div className="fw-semibold">
-                      {result.patientName ??
-                        result.tenKhachHang ??
-                        result.TenKhachHang ??
-                        '—'}
+                      {show(
+                        result.patientName ??
+                          result.tenKhachHang ??
+                          result.TenKhachHang
+                      )}
                     </div>
                   </div>
 
@@ -163,12 +161,22 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Ngày xét nghiệm
                     </div>
-
                     <div className="fw-semibold">
-                      {result.testDate ??
-                        result.ngayXetNghiem ??
-                        result.NgayXetNghiem ??
-                        '—'}
+                      {formatDate(
+                        result.testDate ??
+                          result.approvedAt ??
+                          result.ngayXetNghiem ??
+                          result.NgayXetNghiem
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="small text-secondary">
+                      Bác sĩ khám / chỉ định
+                    </div>
+                    <div className="fw-semibold">
+                      {show(doctorName)}
                     </div>
                   </div>
 
@@ -176,12 +184,8 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Bác sĩ duyệt
                     </div>
-
                     <div className="fw-semibold">
-                      {result.doctorName ??
-                        result.tenBacSi ??
-                        result.TenBacSi ??
-                        '—'}
+                      {show(approvedDoctorName)}
                     </div>
                   </div>
 
@@ -189,12 +193,12 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Mã phiếu xét nghiệm
                     </div>
-
                     <div className="fw-semibold">
-                      {result.orderCode ??
-                        result.maPhieu ??
-                        result.MaPhieu ??
-                        '—'}
+                      {show(
+                        result.orderCode ??
+                          result.maPhieu ??
+                          result.MaPhieu
+                      )}
                     </div>
                   </div>
 
@@ -202,12 +206,24 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Mã mẫu
                     </div>
-
                     <div className="fw-semibold">
-                      {result.specimenCode ??
-                        result.maMau ??
-                        result.MaMau ??
-                        '—'}
+                      {show(
+                        result.specimenCode ??
+                          result.maMau ??
+                          result.MaMau
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="small text-secondary">
+                      Xét nghiệm
+                    </div>
+                    <div className="fw-semibold">
+                      {show(
+                        result.testName ??
+                          result.tenXetNghiem
+                      )}
                     </div>
                   </div>
 
@@ -215,7 +231,6 @@ export default function ChiTietKetQua() {
                     <div className="small text-secondary">
                       Trạng thái
                     </div>
-
                     <span className="badge bg-success mt-1">
                       {result.status ??
                         result.trangThai ??
@@ -237,74 +252,61 @@ export default function ChiTietKetQua() {
                   <table className="table align-middle">
                     <thead className="table-light">
                       <tr>
-                        <th>
-                          Chỉ số
-                        </th>
-
-                        <th>
-                          Kết quả
-                        </th>
-
-                        <th>
-                          Đơn vị
-                        </th>
-
-                        <th>
-                          Khoảng tham chiếu
-                        </th>
-
-                        <th>
-                          Đánh giá
-                        </th>
+                        <th>Chỉ số</th>
+                        <th>Kết quả</th>
+                        <th>Đơn vị</th>
+                        <th>Khoảng tham chiếu</th>
+                        <th>Đánh giá</th>
                       </tr>
                     </thead>
 
                     <tbody>
                       {indicators.length > 0 ? (
                         indicators.map((item, index) => {
-                          const abnormal =
-                            Boolean(
-                              item.abnormal ??
+                          const abnormal = Boolean(
+                            item.abnormal ??
                               item.batThuong ??
                               false
-                            );
+                          );
 
                           return (
                             <tr
                               key={
+                                item.indicatorId ??
                                 item.id ??
                                 item.idChiSo ??
                                 index
                               }
                             >
                               <td className="fw-semibold">
-                                {item.name ??
-                                  item.tenChiSo ??
-                                  item.TenChiSo ??
-                                  '—'}
+                                {show(
+                                  item.name ??
+                                    item.tenChiSo ??
+                                    item.TenChiSo
+                                )}
                               </td>
 
                               <td>
-                                {formatValue(
+                                {show(
                                   item.value ??
-                                  item.giaTri ??
-                                  item.GiaTri
+                                    item.giaTri ??
+                                    item.GiaTri
                                 )}
                               </td>
 
                               <td>
-                                {formatValue(
+                                {show(
                                   item.unit ??
-                                  item.donVi ??
-                                  item.DonVi
+                                    item.donVi ??
+                                    item.DonVi
                                 )}
                               </td>
 
                               <td>
-                                {formatValue(
+                                {show(
                                   item.reference ??
-                                  item.nguongThamChieu ??
-                                  item.NguongThamChieu
+                                    item.nguongThamChieu ??
+                                    item.NguongThamChieu
                                 )}
                               </td>
 
@@ -347,37 +349,29 @@ export default function ChiTietKetQua() {
                 <div
                   className="mb-4"
                   style={{
-                    whiteSpace:
-                      'pre-line',
-                    lineHeight:
-                      1.8,
+                    whiteSpace: 'pre-line',
+                    lineHeight: 1.8,
                   }}
                 >
-                  {result.doctorConclusion ??
+                  {result.conclusion ??
+                    result.doctorConclusion ??
                     result.ketLuanBacSi ??
                     result.KetLuanBacSi ??
                     'Chưa có kết luận.'}
                 </div>
 
-                {(result.advice ??
-                  result.loiDan ??
-                  result.LoiDan) && (
+                {result.notes && (
                   <>
                     <h6 className="fw-bold">
-                      Lời dặn
+                      Ghi chú
                     </h6>
-
                     <div
                       style={{
-                        whiteSpace:
-                          'pre-line',
-                        lineHeight:
-                          1.8,
+                        whiteSpace: 'pre-line',
+                        lineHeight: 1.8,
                       }}
                     >
-                      {result.advice ??
-                        result.loiDan ??
-                        result.LoiDan}
+                      {result.notes}
                     </div>
                   </>
                 )}

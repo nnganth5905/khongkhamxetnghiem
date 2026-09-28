@@ -2,7 +2,7 @@
 import { Routes, Route, Navigate, useParams } from "react-router-dom";
 
 import ProtectedRoute from "../components/ProtectedRoute";
-
+import KetQuaKham from '../pages/customer/KetQuaKham';
 import MainLayout from "../layouts/MainLayout";
 import AdminLayout from "../layouts/AdminLayout";
 import DoctorLayout from "../layouts/DoctorLayout";
@@ -254,17 +254,32 @@ export default function AppRoutes() {
 
       {/* CUSTOMER */}
       <Route element={<ProtectedRoute roles={["CUSTOMER"]} />}>
-        <Route element={<CustomerLayout />}>
+  <Route element={<CustomerLayout />}>
 
-          <Route path="customer" element={<CustomerDashboard />} />
-          <Route path="customer/ket-qua" element={<KetQua />} />
-          <Route path="customer/ket-qua/:resultId" element={<ChiTietKetQua />} />
-          <Route path="customer/theo-doi" element={<TheoDoiLuotKham />} />
-          <Route path="customer/theo-doi-xn" element={<TheoDoiXetNghiem />} />
-          <Route path="customer/lich-su" element={<LichSuTruyVet />} />
+    <Route path="customer" element={<CustomerDashboard />} />
 
-        </Route>
-      </Route>
+    <Route
+      path="customer/ket-qua-kham"
+      element={<KetQuaKham />}
+    />
+
+    <Route
+      path="customer/ket-qua"
+      element={<KetQua />}
+    />
+
+    <Route
+      path="customer/ket-qua/:resultId"
+      element={<ChiTietKetQua />}
+    />
+
+    <Route
+      path="customer/theo-doi"
+      element={<TheoDoiLuotKham />}
+    />
+
+  </Route>
+</Route>
 
       {/* DOCTOR */}
       <Route element={<ProtectedRoute roles={["DOCTOR"]} />}>

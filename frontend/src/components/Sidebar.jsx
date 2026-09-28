@@ -116,108 +116,51 @@ const MENUS = {
 
   DOCTOR: [
     {
-      label:
-        'Bác sĩ',
-
+      label: 'Bác sĩ',
       items: [
         {
-          label:
-            'Tổng quan',
-
-          icon:
-            'fa-solid fa-chart-line',
-
-          path:
-            '/doctor',
-        },
-
-        {
-          label:
-            'Danh sách chờ',
-
-          icon:
-            'fa-solid fa-list-ol',
-
-          path:
-            '/doctor/danh-sach-cho',
-        },
-
-        {
-          label:
-            'Khám bệnh',
-
-          icon:
-            'fa-solid fa-stethoscope',
-
-          path:
-            '/doctor/kham-benh',
-        },
-
-        {
-          label:
-            'Chỉ định xét nghiệm',
-
-          icon:
-            'fa-solid fa-file-medical',
-
-          path:
-            '/doctor/chi-dinh-xet-nghiem',
-        },
-
-        // --- ĐÃ BỔ SUNG 3 MENU MỚI CHO BÁC SĨ ---
-        {
-          label:
-            'Lấy mẫu',
-
-          icon:
-            'fa-solid fa-droplet', // Icon giọt máu/mẫu
-
-          path:
-            '/doctor/lay-mau',
+          label: 'Tổng quan',
+          icon: 'fa-solid fa-chart-line',
+          path: '/doctor',
         },
         {
-          label:
-            'Nhận bàn giao mẫu',
-
-          icon:
-            'fa-solid fa-boxes-packing', // Icon giao nhận hộp mẫu
-
-          path:
-            '/doctor/ban-giao-mau',
+          label: 'Danh sách chờ',
+          icon: 'fa-solid fa-list-ol',
+          path: '/doctor/danh-sach-cho',
         },
         {
-          label:
-            'Đọc kết quả',
-
-          icon:
-            'fa-solid fa-microscope', // Icon phân tích/đọc kết quả
-
-          path:
-            '/doctor/doc-ket-qua',
+          // Trang này cần luotKhamId, nên đưa bác sĩ về danh sách chờ để chọn đúng ca.
+          label: 'Khám bệnh',
+          icon: 'fa-solid fa-stethoscope',
+          path: '/doctor/danh-sach-cho',
         },
-        // ----------------------------------------
-
         {
-          label:
-            'Duyệt kết quả',
-
-          icon:
-            'fa-solid fa-check-double',
-
-          path:
-            '/doctor/duyet-ket-qua',
+          // Không mở trực tiếp vì trang chỉ định cần luotKhamId + idKham.
+          label: 'Chỉ định xét nghiệm',
+          icon: 'fa-solid fa-file-medical',
+          path: '/doctor/danh-sach-cho',
         },
-
-        // {
-        //   label:
-        //     'Lịch làm việc',
-
-        //   icon:
-        //     'fa-regular fa-calendar-days',
-
-        //   path:
-        //     '/doctor/lich-lam-viec',
-        // },
+        {
+          // Không mở trực tiếp vì trang lấy mẫu cần orderId.
+          label: 'Lấy mẫu',
+          icon: 'fa-solid fa-droplet',
+          path: '/doctor/danh-sach-cho',
+        },
+        {
+          label: 'Nhận bàn giao mẫu',
+          icon: 'fa-solid fa-boxes-packing',
+          path: '/doctor/ban-giao-mau',
+        },
+        {
+          label: 'Đọc kết quả',
+          icon: 'fa-solid fa-microscope',
+          path: '/doctor/doc-ket-qua',
+        },
+        {
+          label: 'Duyệt kết quả',
+          icon: 'fa-solid fa-check-double',
+          path: '/doctor/duyet-ket-qua',
+        },
       ],
     },
   ],
@@ -377,6 +320,7 @@ const MENUS = {
           path:
             '/lich-hen',
         },
+        
 
         {
           label:

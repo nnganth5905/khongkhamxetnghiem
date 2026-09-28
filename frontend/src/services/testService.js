@@ -96,3 +96,19 @@ export const printResult = async (id) => {
 // --- ALIASES HỖ TRỢ ---
 export const getResultDetail = getResult;
 export const getTestResult = getResult;
+
+// --- BÁC SĨ: CHỈ ĐỊNH XÉT NGHIỆM TỪ LƯỢT KHÁM ---
+export const createDoctorTestOrder = async (payload) => {
+  const response = await api.post('/doctor/test-orders', payload);
+  return unwrap(response);
+};
+
+export const getDoctorTestOrder = async (orderId) => {
+  const response = await api.get(`/doctor/test-orders/${orderId}`);
+  return unwrap(response);
+};
+
+export const collectDoctorOrderedSpecimen = async (orderId, payload) => {
+  const response = await api.post(`/doctor/test-orders/${orderId}/specimens`, payload);
+  return unwrap(response);
+};

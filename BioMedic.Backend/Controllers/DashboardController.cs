@@ -272,66 +272,115 @@ namespace BioMedic.Backend.Controllers
                 });
             }
         }
-
         [HttpGet("technician")]
         [Authorize(Roles = "TECHNICIAN")]
         public async Task<IActionResult> GetTechnicianDashboard()
         {
-            var technicianId = await GetCurrentTechnicianId();
-            if (technicianId is null)
+            try
             {
-                return Unauthorized(new { message = "Không xác định được kỹ thuật viên." });
-            }
+                var technicianId = await GetCurrentTechnicianId();
 
-            var waitingSpecimens = await _context.Maubenhphams
-                .CountAsync(x => x.TrangThai == "da_ban_giao");
-
-            var receivedSpecimens = await _context.Maubenhphams
-                .CountAsync(x => x.TrangThai == "ktv_tiep_nhan");
-
-            var inProgress = await _context.Worklists
-                .CountAsync(x =>
-                    (x.Idktv == null || x.Idktv == technicianId) &&
-                    x.Status == "running");
-
-            var pendingResultEntries = await _context.Worklists
-                .CountAsync(x =>
-                    (x.Idktv == null || x.Idktv == technicianId) &&
-                    x.Status == "to_result");
-
-            var worklist = await _context.Worklists
-                .AsNoTracking()
-                .Where(x =>
-                    (x.Idktv == null || x.Idktv == technicianId) &&
-                    x.Status != "cancelled")
-                .OrderBy(x => x.ReceivedAt)
-                .Take(10)
-                .Select(x => new
+                if (string.IsNullOrWhiteSpace(technicianId))
                 {
-                    id = x.Id,
-                    specimenCode = x.IdmauNavigation == null
-                        ? x.Idmau
-                        : x.IdmauNavigation.MaBarcode,
-                    patientName = x.IdctphieuNavigation
-                        .IdphieuXetNghiemNavigation
-                        .IdkhachHangNavigation
-                        .TenKhachHang,
-                    testName = x.IdctphieuNavigation
-                        .IdxetNghiemNavigation
-                        .TenXetNghiem,
-                    priority = "NORMAL",
-                    status = x.Status,
-                })
-                .ToListAsync();
+                    return StatusCode(StatusCodes.Status403Forbidden, new
+                    {
+                        success = false,
+                        message = "Tài khoản kỹ thuật viên chưa được liên kết với hồ sơ nhân viên."
+                    });
+                }
 
-            return Ok(new
+                // 1. Mẫu đã được bác sĩ bàn giao, đang chờ KTV tiếp nhận.
+                // Chưa lọc theo IDKTV vì ở giai đoạn này mẫu có thể chưa tạo worklist.
+                var waitingSpecimens = await _context.Maubenhphams
+                    .AsNoTracking()
+                    .CountAsync(x => x.TrangThai == "da_ban_giao");
+
+                // 2. Mẫu đã được KTV tiếp nhận.
+                var receivedSpecimens = await _context.Maubenhphams
+                    .AsNoTracking()
+                    .CountAsync(x => x.TrangThai == "ktv_tiep_nhan");
+
+                // 3. Worklist KTV hiện đang chạy.
+                var inProgress = await _context.Worklists
+                    .AsNoTracking()
+                    .CountAsync(x =>
+                        x.Idktv == technicianId &&
+                        x.Status == "running");
+
+                // 4. Worklist đã chạy xong và đang chờ nhập kết quả.
+                var pendingResultEntries = await _context.Worklists
+                    .AsNoTracking()
+                    .CountAsync(x =>
+                        x.Idktv == technicianId &&
+                        x.Status == "to_result");
+
+                // 5. Chỉ hiển thị các worklist còn cần xử lý.
+                // Không lấy finished/cancelled để tránh dashboard hiển thị dữ liệu cũ đã hoàn tất.
+                // Worklist chưa được gán KTV (IDKTV = NULL) vẫn có thể hiện ở trạng thái queue
+                // để KTV tiếp nhận/xử lý theo workflow hiện tại.
+                var worklist = await _context.Worklists
+                    .AsNoTracking()
+                    .Where(x =>
+                        (x.Idktv == null || x.Idktv == technicianId) &&
+                        (
+                            x.Status == "queue" ||
+                            x.Status == "running" ||
+                            x.Status == "to_result" ||
+                            x.Status == "rerun"
+                        ))
+                    .OrderBy(x => x.Status == "running" ? 0 :
+                                  x.Status == "to_result" ? 1 :
+                                  x.Status == "rerun" ? 2 : 3)
+                    .ThenByDescending(x => x.ReceivedAt)
+                    .Take(10)
+                    .Select(x => new
+                    {
+                        id = x.Id,
+                        specimenId = x.Idmau,
+                        specimenCode = x.IdmauNavigation == null
+                            ? x.Idmau
+                            : x.IdmauNavigation.MaBarcode,
+
+                        patientName =
+                            x.IdctphieuNavigation
+                             .IdphieuXetNghiemNavigation
+                             .IdkhachHangNavigation
+                             .TenKhachHang,
+
+                        testName =
+                            x.IdctphieuNavigation
+                             .IdxetNghiemNavigation
+                             .TenXetNghiem,
+
+                        technicianId = x.Idktv,
+                        priority = "NORMAL",
+                        status = x.Status,
+                        receivedAt = x.ReceivedAt,
+                        startedAt = x.StartedAt,
+                        finishedAt = x.FinishedAt
+                    })
+                    .ToListAsync();
+
+                return Ok(new
+                {
+                    success = true,
+                    technicianId,
+                    waitingSpecimens,
+                    receivedSpecimens,
+                    inProgress,
+                    pendingResultEntries,
+                    worklist
+                });
+            }
+            catch (Exception ex)
             {
-                waitingSpecimens,
-                receivedSpecimens,
-                inProgress,
-                pendingResultEntries,
-                worklist
-            });
+                return StatusCode(StatusCodes.Status500InternalServerError, new
+                {
+                    success = false,
+                    message = ex.Message,
+                    innerMessage = ex.InnerException?.Message
+                });
+            }
         }
 
         [HttpGet("admin")]
@@ -381,7 +430,6 @@ namespace BioMedic.Backend.Controllers
                 .Select(x => (int?)x.IdbacSi)
                 .FirstOrDefaultAsync();
         }
-
         private async Task<string?> GetCurrentTechnicianId()
         {
             if (!int.TryParse(User.FindFirst("userId")?.Value, out var userId))
@@ -389,11 +437,35 @@ namespace BioMedic.Backend.Controllers
                 return null;
             }
 
-            return await _context.Users
+            var account = await _context.Users
                 .AsNoTracking()
-                .Where(x => x.UserId == userId && x.IsActive == true)
-                .Select(x => x.IdnhanVien)
-                .FirstOrDefaultAsync();
+                .FirstOrDefaultAsync(x => x.UserId == userId && x.IsActive == true);
+
+            if (account is null)
+            {
+                return null;
+            }
+
+            // Ưu tiên liên kết trực tiếp users.IDNhanVien.
+            if (!string.IsNullOrWhiteSpace(account.IdnhanVien))
+            {
+                return account.IdnhanVien;
+            }
+
+            // Fallback cho dữ liệu cũ: tìm nhân viên theo email của tài khoản.
+            if (!string.IsNullOrWhiteSpace(account.Email))
+            {
+                return await _context.Nhanviens
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.Email == account.Email &&
+                        x.Status != "no" &&
+                        x.Status != "inactive")
+                    .Select(x => x.IdnhanVien)
+                    .FirstOrDefaultAsync();
+            }
+
+            return null;
         }
 
         private sealed record ReceptionistUpcomingAppointment(

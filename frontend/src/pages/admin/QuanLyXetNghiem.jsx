@@ -17,22 +17,32 @@ const columns = [
       row.MaXetNghiem ??
       row.id ??
       row.idXetNghiem ??
-      row.IDXetNghiem,
+      row.IDXetNghiem ??
+      '—',
   },
   {
     label: 'Tên xét nghiệm',
     value: (row) =>
       row.tenXetNghiem ??
       row.TenXetNghiem ??
-      row.name,
+      row.name ??
+      '—',
+  },
+  {
+    label: 'Chuyên khoa',
+    value: (row) =>
+      row.idLoaiXetNghiem ??
+      row.specialtyId ??
+      row.ChuyenKhoaID ??
+      row.chuyenKhoaId ??
+      '—',
   },
   {
     label: 'Loại xét nghiệm',
     value: (row) =>
-      row.tenLoai ??
-      row.TenLoai ??
-      row.idLoaiXetNghiem ??
-      row.IDLoaiXetNghiem ??
+      row.loai ??
+      row.Loai ??
+      row.type ??
       '—',
   },
   {
@@ -40,6 +50,7 @@ const columns = [
     value: (row) =>
       row.loaiMau ??
       row.LoaiMau ??
+      row.sampleType ??
       '—',
   },
   {
@@ -48,7 +59,21 @@ const columns = [
     value: (row) =>
       row.gia ??
       row.Gia ??
-      row.price,
+      row.price ??
+      0,
+  },
+  {
+    label: 'Thời gian dự kiến',
+    value: (row) => {
+      const minutes =
+        row.expectedMinutes ??
+        row.thoiGianDuKienPhut ??
+        row.ThoiGianDuKienPhut;
+
+      return minutes !== null && minutes !== undefined && minutes !== ''
+        ? `${minutes} phút`
+        : '—';
+    },
   },
   {
     label: 'Trạng thái',
@@ -57,7 +82,7 @@ const columns = [
       row.trangThai ??
       row.TrangThai ??
       row.status ??
-      'ACTIVE',
+      'yes',
   },
 ];
 
@@ -69,16 +94,24 @@ const fields = [
     colClass: 'col-md-6',
   },
   {
+    // adminService hiện map field này sang specialtyId của backend.
     key: 'idLoaiXetNghiem',
-    label: 'Mã loại xét nghiệm',
+    label: 'Mã chuyên khoa',
     required: true,
+    placeholder: 'Ví dụ: CK001',
+    colClass: 'col-md-3',
+  },
+  {
+    key: 'loai',
+    label: 'Loại xét nghiệm',
+    placeholder: 'Ví dụ: Sinh hóa, Huyết học...',
     colClass: 'col-md-3',
   },
   {
     key: 'loaiMau',
     label: 'Loại mẫu',
     placeholder: 'Máu, huyết thanh, nước tiểu...',
-    colClass: 'col-md-3',
+    colClass: 'col-md-4',
   },
   {
     key: 'gia',
@@ -86,26 +119,30 @@ const fields = [
     type: 'number',
     min: 0,
     step: 1000,
+    defaultValue: 0,
     colClass: 'col-md-4',
   },
   {
-    key: 'thoiGianTraKetQua',
-    label: 'Thời gian trả kết quả',
-    placeholder: 'Ví dụ: 2 giờ / 24 giờ',
+    key: 'expectedMinutes',
+    label: 'Thời gian dự kiến (phút)',
+    type: 'number',
+    min: 1,
+    step: 1,
+    placeholder: 'Ví dụ: 120',
     colClass: 'col-md-4',
   },
   {
     key: 'trangThai',
     label: 'Trạng thái',
     type: 'select',
-    defaultValue: 'ACTIVE',
+    defaultValue: 'yes',
     options: [
       {
-        value: 'ACTIVE',
+        value: 'yes',
         label: 'Đang cung cấp',
       },
       {
-        value: 'INACTIVE',
+        value: 'no',
         label: 'Ngừng cung cấp',
       },
     ],
@@ -116,13 +153,6 @@ const fields = [
     label: 'Mô tả',
     type: 'textarea',
     rows: 4,
-    colClass: 'col-12',
-  },
-  {
-    key: 'chuanBi',
-    label: 'Hướng dẫn chuẩn bị',
-    type: 'textarea',
-    rows: 3,
     colClass: 'col-12',
   },
 ];
@@ -144,7 +174,7 @@ export default function QuanLyXetNghiem() {
         row.idXetNghiem ??
         row.IDXetNghiem
       }
-      searchPlaceholder="Tìm mã xét nghiệm, tên xét nghiệm, loại xét nghiệm..."
+      searchPlaceholder="Tìm mã xét nghiệm, tên xét nghiệm, chuyên khoa..."
       addButtonText="Thêm xét nghiệm"
       formTitleCreate="Thêm xét nghiệm"
       formTitleEdit="Cập nhật xét nghiệm"

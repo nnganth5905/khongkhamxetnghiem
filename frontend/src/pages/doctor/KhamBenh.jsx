@@ -37,21 +37,45 @@ export default function KhamBenh() {
         // Gọi API lấy dữ liệu khám bệnh
         const data = await visitService.getExamination(luotKhamId);
         
-        setPatientInfo({
-          TenKhachHang: data.TenKhachHang,
-          GioiTinh: data.GioiTinh === 'nam' ? 'Nam' : data.GioiTinh === 'nu' ? 'Nữ' : 'Khác',
-          NgaySinh: data.NgaySinh,
-          SoDienThoai: data.SoDienThoai
-        });
+        const gender = data.gioiTinh ?? data.GioiTinh;
+
+setPatientInfo({
+  TenKhachHang:
+    data.tenKhachHang ??
+    data.TenKhachHang ??
+    '',
+
+  GioiTinh:
+    gender === 'nam'
+      ? 'Nam'
+      : gender === 'nu'
+      ? 'Nữ'
+      : gender
+      ? 'Khác'
+      : '',
+
+  NgaySinh:
+    data.ngaySinh ??
+    data.NgaySinh ??
+    '',
+
+  SoDienThoai:
+    data.soDienThoai ??
+    data.SoDienThoai ??
+    ''
+});
+
+setIdKham(data.idKham ?? data.IDKham ?? null);
+
+setMedicalRecord({
+  trieuChung: data.trieuChung ?? data.TrieuChung ?? '',
+  tienSuBenh: data.tienSuBenh ?? data.TienSuBenh ?? '',
+  chanDoan: data.chanDoan ?? data.ChanDoan ?? '',
+  ketLuan: data.ketLuan ?? data.KetLuan ?? '',
+  huongDieuTri: data.huongDieuTri ?? data.HuongDieuTri ?? '',
+});
         
-        setIdKham(data.IDKham);
-        setMedicalRecord({
-          trieuChung: data.TrieuChung || '',
-          tienSuBenh: data.TienSuBenh || '',
-          chanDoan: data.ChanDoan || '',
-          ketLuan: data.KetLuan || '',
-          huongDieuTri: data.HuongDieuTri || '',
-        });
+        
       } catch (err) {
         setMessage({ type: 'danger', text: getApiErrorMessage(err, 'Không thể tải thông tin bệnh án.') });
       } finally {
@@ -97,14 +121,44 @@ export default function KhamBenh() {
   };
 
   const handleOrderTest = async () => {
-    try {
-      // Lưu tạm hồ sơ trước khi nhảy sang trang chỉ định
-      await visitService.saveExamination(idKham, medicalRecord, luotKhamId);
-      navigate(`/doctor/chi-dinh-xet-nghiem?idKham=${idKham}&luotKhamId=${luotKhamId}`);
-    } catch (err) {
-      setMessage({ type: 'danger', text: getApiErrorMessage(err, 'Vui lòng lưu hồ sơ trước khi chuyển trang.') });
+  if (!luotKhamId) {
+    setMessage({
+      type: 'danger',
+      text: 'Không tìm thấy mã lượt khám.',
+    });
+    return;
+  }
+
+  try {
+    // Nếu đã có hồ sơ khám thì lưu trước.
+    if (idKham) {
+      await visitService.saveExamination(
+        idKham,
+        medicalRecord,
+        luotKhamId
+      );
     }
-  };
+
+    let url =
+      `/doctor/chi-dinh-xet-nghiem?luotKhamId=${encodeURIComponent(
+        luotKhamId
+      )}`;
+
+    if (idKham) {
+      url += `&idKham=${encodeURIComponent(idKham)}`;
+    }
+
+    navigate(url);
+  } catch (err) {
+    setMessage({
+      type: 'danger',
+      text: getApiErrorMessage(
+        err,
+        'Không thể chuyển sang chỉ định xét nghiệm.'
+      ),
+    });
+  }
+};
 
   return (
     <div className="container-fluid py-4" style={{ maxWidth: '900px', minHeight: '100vh', backgroundColor: '#f8f9fa' }}>
@@ -192,7 +246,13 @@ export default function KhamBenh() {
                 </button>
 
                 <div className="d-flex gap-2">
-                  <button type="button" className="btn btn-warning px-4 fw-medium text-dark shadow-sm" onClick={handleOrderTest}>
+                  <button
+                    type="button"
+                    className="btn btn-warning px-4 fw-medium text-dark shadow-sm"
+                    onClick={handleOrderTest}
+                    disabled={saving || !luotKhamId}
+                    title={!luotKhamId || !idKham ? 'Hãy mở ca bệnh từ Danh sách chờ và lưu hồ sơ trước.' : ''}
+                  >
                     <i className="fa-solid fa-vial-circle-check me-2"></i> Chỉ định xét nghiệm
                   </button>
                   <button type="button" className="btn btn-success px-4 fw-medium shadow-sm" onClick={handleComplete}>

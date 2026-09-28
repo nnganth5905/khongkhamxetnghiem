@@ -1,12 +1,15 @@
 // src/pages/doctor/ChiDinhXetNghiem.jsx
-import React, { useState, useEffect } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { getApiErrorMessage } from '../../services/api';
-import { getTests } from '../../services/testService';
+import { createDoctorTestOrder, getTests } from '../../services/testService';
 
 export default function ChiDinhXetNghiem() {
   const navigate = useNavigate();
-  const { appointmentId } = useParams();
+  const [searchParams] = useSearchParams();
+
+  const luotKhamId = searchParams.get('luotKhamId');
+  const idKham = searchParams.get('idKham');
 
   const [testList, setTestList] = useState([]);
   const [selectedTests, setSelectedTests] = useState([]);
@@ -18,10 +21,12 @@ export default function ChiDinhXetNghiem() {
 
   useEffect(() => {
     let active = true;
+
     const fetchAvailableTests = async () => {
       try {
         setFetching(true);
         const data = await getTests();
+
         if (active) {
           setTestList(Array.isArray(data) ? data : data?.tests || []);
         }
@@ -38,6 +43,7 @@ export default function ChiDinhXetNghiem() {
     };
 
     fetchAvailableTests();
+
     return () => {
       active = false;
     };
@@ -53,6 +59,15 @@ export default function ChiDinhXetNghiem() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    if (!luotKhamId) {
+      setMessage({
+        type: 'danger',
+        text: 'Không tìm thấy mã lượt khám. Hãy mở Chỉ định xét nghiệm từ ca khám đang xử lý.',
+      });
+      return;
+    }
+
     if (selectedTests.length === 0) {
       setMessage({
         type: 'warning',
@@ -65,14 +80,34 @@ export default function ChiDinhXetNghiem() {
     setMessage({ type: '', text: '' });
 
     try {
-      // Logic gửi yêu cầu chỉ định xét nghiệm
+      const result = await createDoctorTestOrder({
+        visitId: luotKhamId,
+        examinationId: idKham ? Number(idKham) : null,
+        diagnosis: diagnosis.trim(),
+        notes: notes.trim(),
+        testIds: selectedTests,
+      });
+
+      const orderId =
+        result?.orderId ||
+        result?.idPhieuXetNghiem ||
+        result?.id ||
+        result?.IDPhieuXetNghiem;
+
       setMessage({
         type: 'success',
-        text: 'Chỉ định xét nghiệm thành công!',
+        text: orderId
+          ? `Chỉ định xét nghiệm thành công. Mã phiếu: ${orderId}`
+          : 'Chỉ định xét nghiệm thành công.',
       });
-      setTimeout(() => {
-        navigate(-1);
-      }, 800);
+
+      if (orderId) {
+        setTimeout(() => {
+          navigate(
+            `/doctor/lay-mau?orderId=${encodeURIComponent(orderId)}&luotKhamId=${encodeURIComponent(luotKhamId)}`
+          );
+        }, 900);
+      }
     } catch (err) {
       setMessage({
         type: 'danger',
@@ -92,14 +127,36 @@ export default function ChiDinhXetNghiem() {
             Tạo phiếu yêu cầu xét nghiệm cho bệnh nhân
           </p>
         </div>
+
         <button
           type="button"
           className="btn btn-outline-secondary btn-sm"
-          onClick={() => navigate(-1)}
+          onClick={() => {
+            if (luotKhamId) {
+              navigate(`/doctor/kham-benh?luotKhamId=${encodeURIComponent(luotKhamId)}`);
+            } else {
+              navigate('/doctor/danh-sach-cho');
+            }
+          }}
         >
           Quay lại
         </button>
       </div>
+
+      {!luotKhamId && (
+        <div className="alert alert-warning d-flex flex-wrap justify-content-between align-items-center gap-2">
+          <span>
+            Trang này cần <strong>luotKhamId</strong>. Hãy chọn bệnh nhân từ Danh sách chờ.
+          </span>
+          <button
+            type="button"
+            className="btn btn-sm btn-warning"
+            onClick={() => navigate('/doctor/danh-sach-cho')}
+          >
+            Mở danh sách chờ
+          </button>
+        </div>
+      )}
 
       {message.text && (
         <div className={`alert alert-${message.type} mb-3`} role="alert">
@@ -107,7 +164,10 @@ export default function ChiDinhXetNghiem() {
         </div>
       )}
 
-      <form className="card border-0 shadow-sm rounded-4 p-4" onSubmit={handleSubmit}>
+      <form
+        className="card border-0 shadow-sm rounded-4 p-4"
+        onSubmit={handleSubmit}
+      >
         <div className="mb-3">
           <label className="form-label fw-semibold">Chẩn đoán sơ bộ</label>
           <input
@@ -122,47 +182,60 @@ export default function ChiDinhXetNghiem() {
 
         <div className="mb-3">
           <label className="form-label fw-semibold">Chọn xét nghiệm *</label>
+
           {fetching ? (
-            <div className="text-secondary small">Đang tải danh mục xét nghiệm...</div>
+            <div className="text-secondary small">
+              Đang tải danh mục xét nghiệm...
+            </div>
           ) : (
             <div
               className="border rounded p-3 overflow-auto"
               style={{ maxHeight: '240px' }}
             >
-              {testList.map((test) => {
-                const id = test.id || test.IDXetNghiem;
-                const name = test.name || test.TenXetNghiem;
-                const price = test.price || test.Gia;
-                return (
-                  <div key={id} className="form-check mb-2">
-                    <input
-                      type="checkbox"
-                      id={`test-${id}`}
-                      className="form-check-input"
-                      checked={selectedTests.includes(id)}
-                      onChange={() => handleToggleTest(id)}
-                    />
-                    <label
-                      className="form-check-label d-flex justify-content-between"
-                      htmlFor={`test-${id}`}
-                      style={{ cursor: 'pointer' }}
-                    >
-                      <span>{name}</span>
-                      {price && (
-                        <span className="text-muted ms-2">
-                          {Number(price).toLocaleString()} đ
-                        </span>
-                      )}
-                    </label>
-                  </div>
-                );
-              })}
+              {testList.length === 0 ? (
+                <div className="text-muted">Không có xét nghiệm khả dụng.</div>
+              ) : (
+                testList.map((test) => {
+                  const id = test.id || test.IDXetNghiem;
+                  const name = test.name || test.TenXetNghiem;
+                  const price = test.price ?? test.Gia;
+
+                  return (
+                    <div key={id} className="form-check mb-2">
+                      <input
+                        type="checkbox"
+                        id={`test-${id}`}
+                        className="form-check-input"
+                        checked={selectedTests.includes(id)}
+                        onChange={() => handleToggleTest(id)}
+                      />
+
+                      <label
+                        className="form-check-label d-flex justify-content-between"
+                        htmlFor={`test-${id}`}
+                        style={{ cursor: 'pointer' }}
+                      >
+                        <span>{name}</span>
+
+                        {price !== undefined && price !== null && (
+                          <span className="text-muted ms-2">
+                            {Number(price).toLocaleString('vi-VN')} đ
+                          </span>
+                        )}
+                      </label>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </div>
 
         <div className="mb-3">
-          <label className="form-label fw-semibold">Ghi chú lâm sàng / dặn dò</label>
+          <label className="form-label fw-semibold">
+            Ghi chú lâm sàng / dặn dò
+          </label>
+
           <textarea
             rows="3"
             className="form-control"
@@ -176,7 +249,7 @@ export default function ChiDinhXetNghiem() {
           <button
             type="submit"
             className="btn btn-primary px-4"
-            disabled={loading || fetching}
+            disabled={loading || fetching || !luotKhamId}
           >
             {loading ? 'Đang gửi chỉ định...' : 'Xác nhận chỉ định'}
           </button>

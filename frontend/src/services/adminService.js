@@ -22,16 +22,54 @@ const customerPayload = (x) => ({
   cccd: x.cccd || null, status: statusToYesNo(x.status)
 });
 
+const normalizeEmployeeRole = (value) => {
+  const role = String(value ?? '').trim().toLowerCase();
+
+  const map = {
+    receptionist: 'letan',
+    'lễ tân': 'letan',
+    'le tan': 'letan',
+    technician: 'ktv',
+    'kỹ thuật viên': 'ktv',
+    'ky thuat vien': 'ktv',
+    staff: 'khac',
+    'nhân viên': 'khac',
+    'nhan vien': 'khac',
+    nurse: 'dieu_duong',
+    'điều dưỡng': 'dieu_duong',
+    'dieu duong': 'dieu_duong',
+    administrator: 'admin',
+    'quản trị viên': 'admin',
+    'quan tri vien': 'admin',
+    doctor: 'bacsi',
+    'bác sĩ': 'bacsi',
+    'bac si': 'bacsi',
+  };
+
+  const normalized = map[role] ?? role;
+
+  return ['bacsi', 'letan', 'ktv', 'admin', 'dieu_duong', 'khac'].includes(normalized)
+    ? normalized
+    : 'khac';
+};
+
 const mapEmployee = (x) => ({
-  ...x, idNhanVien: x.id ?? x.idNhanVien, hoTen: x.name ?? x.hoTen,
-  vaiTro: x.position ?? x.vaiTro, soDienThoai: x.phone ?? x.soDienThoai,
-  idCoSo: x.facilityId ?? x.idCoSo, trangThai: x.status ?? x.trangThai
+  ...x,
+  idNhanVien: x.id ?? x.idNhanVien,
+  hoTen: x.name ?? x.hoTen,
+  vaiTro: normalizeEmployeeRole(x.position ?? x.vaiTro),
+  soDienThoai: x.phone ?? x.soDienThoai,
+  idCoSo: x.facilityId ?? x.idCoSo,
+  trangThai: statusToYesNo(x.status ?? x.trangThai),
 });
+
 const employeePayload = (x) => ({
-  name: x.hoTen ?? x.name ?? '', position: x.vaiTro ?? x.position ?? 'STAFF',
-  phone: x.soDienThoai ?? x.phone ?? null, email: x.email || null,
+  name: String(x.hoTen ?? x.name ?? '').trim(),
+  position: normalizeEmployeeRole(x.vaiTro ?? x.position),
+  phone: x.soDienThoai ?? x.phone ?? null,
+  email: x.email || null,
   facilityId: x.idCoSo ?? x.facilityId ?? null,
-  status: statusToYesNo(x.trangThai ?? x.status)
+  status: statusToYesNo(x.trangThai ?? x.status),
 });
 
 const mapDoctor = (x) => ({

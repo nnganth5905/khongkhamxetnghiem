@@ -135,38 +135,100 @@ namespace BioMedic.Backend.Controllers
         public async Task<IActionResult> Register([FromBody] RegisterDto model)
         {
             var email = model.Email.Trim().ToLowerInvariant();
+            var phone = string.IsNullOrWhiteSpace(model.Phone)
+                ? null
+                : model.Phone.Trim();
+
             if (await _context.Users.AnyAsync(account =>
                 account.Email == email || account.Username == email))
             {
-                return Conflict(new { success = false, message = "Email này đã được sử dụng." });
+                return Conflict(new
+                {
+                    success = false,
+                    message = "Email này đã được sử dụng."
+                });
             }
 
-            var customerId = $"KH{Guid.NewGuid():N}"[..10].ToUpperInvariant();
-            var customer = new Khachhang
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            // 1. Nếu khách đã từng đặt lịch khi chưa có tài khoản,
+            // ưu tiên dùng lại đúng hồ sơ khách hàng đã được cấp trước đó.
+            Khachhang? customer = await _context.Khachhangs
+                .OrderByDescending(x => x.CreatedAt)
+                .FirstOrDefaultAsync(x =>
+                    x.Email != null &&
+                    x.Email.ToLower() == email);
+
+            // 2. Nếu chưa tìm thấy theo email, thử ghép theo số điện thoại.
+            if (customer is null && !string.IsNullOrWhiteSpace(phone))
             {
-                IdkhachHang = customerId,
-                TenKhachHang = model.Name.Trim(),
-                Email = email,
-                SoDienThoai = string.IsNullOrWhiteSpace(model.Phone) ? null : model.Phone.Trim(),
-                GioiTinh = NormalizeGender(model.Gender),
-                Status = "yes",
-                CreatedAt = DateTime.UtcNow,
-            };
+                customer = await _context.Khachhangs
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync(x =>
+                        x.SoDienThoai == phone);
+            }
+
+            // 3. Chỉ tạo IDKhachHang mới khi thực sự chưa có hồ sơ nào phù hợp.
+            if (customer is null)
+            {
+                var customerId =
+                    $"KH{Guid.NewGuid():N}"[..10].ToUpperInvariant();
+
+                customer = new Khachhang
+                {
+                    IdkhachHang = customerId,
+                    TenKhachHang = model.Name.Trim(),
+                    Email = email,
+                    SoDienThoai = phone,
+                    GioiTinh = NormalizeGender(model.Gender),
+                    Status = "yes",
+                    CreatedAt = DateTime.UtcNow,
+                };
+
+                _context.Khachhangs.Add(customer);
+            }
+            else
+            {
+                // Bổ sung/cập nhật thông tin cơ bản cho hồ sơ cũ,
+                // nhưng KHÔNG đổi IDKhachHang.
+                if (string.IsNullOrWhiteSpace(customer.Email))
+                    customer.Email = email;
+
+                if (string.IsNullOrWhiteSpace(customer.SoDienThoai) &&
+                    !string.IsNullOrWhiteSpace(phone))
+                {
+                    customer.SoDienThoai = phone;
+                }
+
+                if (!string.IsNullOrWhiteSpace(model.Name))
+                    customer.TenKhachHang = model.Name.Trim();
+
+                if (!string.IsNullOrWhiteSpace(model.Gender))
+                    customer.GioiTinh = NormalizeGender(model.Gender);
+
+                customer.Status = "yes";
+                customer.UpdatedAt = DateTime.UtcNow;
+            }
 
             var user = new User
             {
                 Email = email,
                 Username = email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
+                PasswordHash =
+                    BCrypt.Net.BCrypt.HashPassword(model.Password),
                 Role = "khachhang",
-                IdkhachHang = customerId,
+
+                // QUAN TRỌNG: tài khoản luôn trỏ đúng hồ sơ khách hàng
+                // đã tồn tại hoặc vừa được tạo.
+                IdkhachHang = customer.IdkhachHang,
+
                 IsActive = true,
                 CreatedAt = DateTime.UtcNow,
             };
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-            _context.Khachhangs.Add(customer);
             _context.Users.Add(user);
+
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
 
@@ -175,6 +237,8 @@ namespace BioMedic.Backend.Controllers
                 success = true,
                 message = "Đăng ký tài khoản thành công!",
                 email,
+                customerId = customer.IdkhachHang,
+                reusedCustomer = customer.CreatedAt < DateTime.UtcNow.AddSeconds(-2)
             });
         }
 

@@ -99,6 +99,7 @@ D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\BioMedic.Backend.Assemb
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\BioMedic.Backend.csproj.CoreCompileInputs.cache
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\BioMedic.Backend.MvcApplicationPartsAssemblyInfo.cs
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\BioMedic.Backend.MvcApplicationPartsAssemblyInfo.cache
+D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\BioMedic.Backend.sourcelink.json
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\rjimswa.dswa.cache.json
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\rjsmrazor.dswa.cache.json
 D:\Downloads\BioMedic\BioMedic.Backend\obj\Debug\net10.0\rjsmcshtml.dswa.cache.json

@@ -33,3 +33,15 @@ yarn-error.log*
 
 # ZIP files
 *.zip
+
+# .NET
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+
+
+# Node
+**/node_modules/
+**/dist/

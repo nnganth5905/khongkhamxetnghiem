@@ -47,6 +47,27 @@ const sameCK = (a, b) => {
   return Boolean(na && nb && na === nb);
 };
 
+const getDoctorSpecialtyId = (doctor) =>
+  doctor?.KhoaID ??
+  doctor?.KhoaId ??
+  doctor?.khoaID ??
+  doctor?.khoaId ??
+  doctor?.ChuyenKhoaID ??
+  doctor?.ChuyenKhoaId ??
+  doctor?.chuyenKhoaID ??
+  doctor?.chuyenKhoaId ??
+  doctor?.specialtyId ??
+  doctor?.SpecialtyId ??
+  '';
+
+const getDoctorIdValue = (doctor) =>
+  doctor?.IDBacSi ??
+  doctor?.IdBacSi ??
+  doctor?.idBacSi ??
+  doctor?.idbacsi ??
+  doctor?.id ??
+  '';
+
 const getLocalToday = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -160,36 +181,85 @@ export default function DatLichXetNghiem({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const prefillCK = params.get('khoa') || params.get('ck') || '';
-    const prefillIdbs = params.get('idbs') || '';
-    const prefillIdxn = params.get('idxn') || '';
-    const prefillNote = params.get('note') || '';
+
+    const prefillDoctor =
+      params.get('idbs') ||
+      params.get('doctorId') ||
+      '';
+
     const prefillDate = params.get('date') || '';
     const prefillTime = params.get('time') || '';
+    const prefillIdxn = params.get('idxn') || '';
+    const prefillNote = params.get('note') || '';
+
+    let prefillCK =
+      params.get('khoa') ||
+      params.get('ck') ||
+      '';
+
+    // Nếu trang Đội ngũ bác sĩ không truyền được chuyên khoa,
+    // tự suy ra chuyên khoa từ chính bác sĩ đã chọn.
+    if (!prefillCK && prefillDoctor && allDoctors.length > 0) {
+      const doctor = allDoctors.find(
+        (item) =>
+          String(getDoctorIdValue(item)) === String(prefillDoctor)
+      );
+
+      if (doctor) {
+        prefillCK = String(getDoctorSpecialtyId(doctor) || '');
+      }
+    }
 
     if (prefillCK) {
       setSelectedCK(prefillCK);
-    } else if (Object.keys(departments).length > 0) {
+    } else if (!prefillDoctor && Object.keys(departments).length > 0) {
+      // Chỉ chọn chuyên khoa mặc định khi người dùng KHÔNG đi từ một bác sĩ cụ thể.
       setSelectedCK((current) => current || Object.keys(departments)[0]);
     }
 
-    if (prefillIdxn) setSelectedXN(prefillIdxn);
-    if (prefillIdbs) setSelectedDoctor(prefillIdbs);
-    if (prefillNote) setNote(prefillNote);
-    if (prefillDate) setSelectedDate(prefillDate);
-    if (prefillTime) setSelectedTime(prefillTime);
-  }, [departments]);
+    if (prefillDoctor) {
+      setSelectedDoctor(String(prefillDoctor));
+    }
+
+    if (prefillIdxn) {
+      setSelectedXN(prefillIdxn);
+    }
+
+    if (prefillNote) {
+      setNote(prefillNote);
+    }
+
+    if (prefillDate) {
+      setSelectedDate(prefillDate);
+    }
+
+    if (prefillTime) {
+      setSelectedTime(String(prefillTime).substring(0, 5));
+    }
+  }, [departments, allDoctors]);
 
   const filteredTests = useMemo(() => {
     return allTests.filter((test) =>
       // ĐÃ BỔ SUNG `test.categoryId` để nhận diện đúng dữ liệu từ Backend
-      sameCK(test.ChuyenKhoaID ?? test.chuyenKhoaId ?? test.specialtyId ?? test.categoryId, selectedCK)
+      sameCK(
+        test.ChuyenKhoaID ??
+        test.ChuyenKhoaId ??
+        test.chuyenKhoaID ??
+        test.chuyenKhoaId ??
+        test.KhoaID ??
+        test.KhoaId ??
+        test.khoaID ??
+        test.khoaId ??
+        test.specialtyId ??
+        test.categoryId,
+        selectedCK
+      )
     );
   }, [allTests, selectedCK]);
 
   const filteredDoctors = useMemo(() => {
     return allDoctors.filter((doctor) =>
-      sameCK(doctor.KhoaID ?? doctor.khoaId ?? doctor.specialtyId, selectedCK)
+      sameCK(getDoctorSpecialtyId(doctor), selectedCK)
     );
   }, [allDoctors, selectedCK]);
 

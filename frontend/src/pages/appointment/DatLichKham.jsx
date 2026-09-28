@@ -44,6 +44,27 @@ const sameCK = (a, b) => {
   return Boolean(na && nb && na === nb);
 };
 
+const getDoctorSpecialtyId = (doctor) =>
+  doctor?.KhoaID ??
+  doctor?.KhoaId ??
+  doctor?.khoaID ??
+  doctor?.khoaId ??
+  doctor?.ChuyenKhoaID ??
+  doctor?.ChuyenKhoaId ??
+  doctor?.chuyenKhoaID ??
+  doctor?.chuyenKhoaId ??
+  doctor?.specialtyId ??
+  doctor?.SpecialtyId ??
+  '';
+
+const getDoctorIdValue = (doctor) =>
+  doctor?.IDBacSi ??
+  doctor?.IdBacSi ??
+  doctor?.idBacSi ??
+  doctor?.idbacsi ??
+  doctor?.id ??
+  '';
+
 const getLocalToday = () => {
   const now = new Date();
   const year = now.getFullYear();
@@ -62,7 +83,8 @@ export default function DatLichKham({
   currentUser: currentUserProp = null,
 }) {
   const navigate = useNavigate();
-  const { user: authUser } = useAuth(); 
+  const { user: authUser } = useAuth();
+  const isGuest = !authUser;
 
   const [departments, setDepartments] = useState(departmentsProp || {});
   const [allDoctors, setAllDoctors] = useState(allDoctorsProp || []);
@@ -97,6 +119,7 @@ export default function DatLichKham({
 
   const [takenTimes, setTakenTimes] = useState(new Set());
   const [errMsg, setErrMsg] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -145,19 +168,65 @@ export default function DatLichKham({
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const prefillCK = params.get('khoa') || params.get('ck') || '';
+
+    const prefillDoctor =
+      params.get('idbs') ||
+      params.get('doctorId') ||
+      '';
+
+    const prefillDate = params.get('date') || '';
+    const prefillTime = params.get('time') || '';
+
+    let prefillCK =
+      params.get('khoa') ||
+      params.get('ck') ||
+      '';
+
+    // Nếu URL có bác sĩ nhưng thiếu chuyên khoa,
+    // tự tìm chuyên khoa của chính bác sĩ đó sau khi danh sách bác sĩ tải xong.
+    if (!prefillCK && prefillDoctor && allDoctors.length > 0) {
+      const doctor = allDoctors.find(
+        (item) =>
+          String(getDoctorIdValue(item)) === String(prefillDoctor)
+      );
+
+      if (doctor) {
+        prefillCK = String(getDoctorSpecialtyId(doctor) || '');
+      }
+    }
+
     if (prefillCK) {
       setSelectedCK(prefillCK);
-    } else if (Object.keys(departments).length > 0) {
+    } else if (!prefillDoctor && Object.keys(departments).length > 0) {
+      // Chỉ dùng chuyên khoa mặc định khi không đi từ trang chọn bác sĩ.
       setSelectedCK((current) => current || Object.keys(departments)[0]);
     }
-  }, [departments]);
+
+    if (prefillDoctor) {
+      setSelectedDoctor(String(prefillDoctor));
+    }
+
+    if (prefillDate) {
+      setSelectedDate(prefillDate);
+    }
+
+    if (prefillTime) {
+      setSelectedTime(String(prefillTime).substring(0, 5));
+    }
+  }, [departments, allDoctors]);
 
   const filteredDoctors = useMemo(() => {
+    // Khi người dùng chọn "Tôi chưa biết cần khám gì",
+    // không khóa danh sách bác sĩ theo một chuyên khoa cố định.
+    // Hiển thị toàn bộ bác sĩ để người dùng vẫn có thể chọn.
+    if (unknownCK) {
+      return allDoctors;
+    }
+
     return allDoctors.filter((doctor) =>
-      sameCK(doctor.KhoaID ?? doctor.khoaId ?? doctor.specialtyId, selectedCK)
+      sameCK(getDoctorSpecialtyId(doctor), selectedCK)
     );
-  }, [allDoctors, selectedCK]);
+  }, [allDoctors, selectedCK, unknownCK]);
 
   const handleUnknownCKChange = (e) => {
     const checked = e.target.checked;
@@ -165,13 +234,29 @@ export default function DatLichKham({
 
     if (checked) {
       setPrevCK(selectedCK);
+
+      // Ưu tiên Nội tổng quát nếu hệ thống có khoa này.
+      // Tuy nhiên không ép danh sách bác sĩ phải thuộc CK015,
+      // vì dữ liệu thực tế có thể không có bác sĩ gắn với CK015.
       setSelectedCK(CK_GENERAL);
-      const genDocs = allDoctors.filter((doctor) =>
-        sameCK(doctor.KhoaID ?? doctor.khoaId ?? doctor.specialtyId, CK_GENERAL)
-      );
-      if (genDocs.length > 0) {
-        const id = genDocs[0].IDBacSi ?? genDocs[0].id;
-        setSelectedDoctor(String(id));
+
+      if (allDoctors.length > 0) {
+        const firstDoctor = allDoctors[0];
+        const firstDoctorId = getDoctorIdValue(firstDoctor);
+        const firstDoctorCK = getDoctorSpecialtyId(firstDoctor);
+
+        setSelectedDoctor(
+          firstDoctorId !== null && firstDoctorId !== undefined
+            ? String(firstDoctorId)
+            : ''
+        );
+
+        // Nếu CK015 không tồn tại trong departments thì dùng chuyên khoa thật của bác sĩ.
+        if (!Object.prototype.hasOwnProperty.call(departments, CK_GENERAL) && firstDoctorCK) {
+          setSelectedCK(String(firstDoctorCK));
+        }
+      } else {
+        setSelectedDoctor('');
       }
     } else {
       setSelectedCK(prevCK || Object.keys(departments)[0] || '');
@@ -202,30 +287,48 @@ export default function DatLichKham({
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErrMsg('');
+    setSuccessMsg('');
 
     if (!selectedDoctor || !selectedDate || !selectedTime || !selectedCK) {
       setErrMsg('Vui lòng chọn đầy đủ chuyên khoa, bác sĩ, ngày và giờ.');
       return;
     }
 
-    let finalName = forOther ? otherInfo.p_name.trim() : selfInfo.hoten.trim();
-    let finalPhone = forOther ? otherInfo.p_phone.trim() : selfInfo.sdt.trim();
-    let finalEmail = forOther ? otherInfo.p_email.trim() : selfInfo.email.trim();
-    
-    // Khai báo bổ sung thêm các biến truyền Data vào Payload
-    let finalGender = forOther ? otherInfo.p_gender : selfInfo.gioitinh;
-    let finalDob = forOther ? otherInfo.p_dob : selfInfo.ngaysinh;
+    if (takenTimes.has(selectedTime)) {
+      setErrMsg('Khung giờ này vừa có người đặt. Vui lòng chọn giờ khác.');
+      return;
+    }
 
-    if (forOther) {
-      if (!finalName || !finalPhone || !finalEmail) {
-        setErrMsg('Vui lòng nhập đầy đủ Họ tên, SĐT và Email của người khám.');
-        return;
-      }
-    } else {
-      if (!finalPhone) {
-        setErrMsg('Hệ thống không tìm thấy Số điện thoại của bạn. Vui lòng tải lại trang hoặc cập nhật hồ sơ.');
-        return;
-      }
+    const useManualInfo = isGuest || forOther;
+
+    const finalName = useManualInfo
+      ? otherInfo.p_name.trim()
+      : selfInfo.hoten.trim();
+
+    const finalPhone = useManualInfo
+      ? otherInfo.p_phone.trim()
+      : selfInfo.sdt.trim();
+
+    const finalEmail = useManualInfo
+      ? otherInfo.p_email.trim()
+      : selfInfo.email.trim();
+
+    const finalGender = useManualInfo
+      ? otherInfo.p_gender
+      : selfInfo.gioitinh;
+
+    const finalDob = useManualInfo
+      ? otherInfo.p_dob
+      : selfInfo.ngaysinh;
+
+    if (!finalName || !finalPhone || !finalEmail) {
+      setErrMsg('Vui lòng nhập đầy đủ Họ tên, SĐT và Email của người khám.');
+      return;
+    }
+
+    if (!/^[0-9+\-\s]{9,15}$/.test(finalPhone)) {
+      setErrMsg('Số điện thoại không hợp lệ.');
+      return;
     }
 
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
@@ -237,24 +340,45 @@ export default function DatLichKham({
       hoten: finalName,
       email: finalEmail,
       sodienthoai: finalPhone,
-      gioitinh: finalGender, // Đã bổ sung
-      ngaysinh: finalDob,    // Đã bổ sung
+      gioitinh: finalGender,
+      ngaysinh: finalDob,
       ngay: selectedDate,
       gio: selectedTime,
       idbacsi: selectedDoctor,
       idchuyenkhoa: selectedCK,
-      idcoso: "CS001",
+      idcoso: 'CS001',
       lydokham: note,
-      ghichu: note
+      ghichu: note,
     };
 
     try {
       setLoading(true);
-      // Gọi API (createExaminationAppointment hoặc createTestAppointment tùy file)
-      await createExaminationAppointment(payload); 
-      
-      navigate('/lich-hen'); // Chuyển hướng về trang danh sách thay vì trang chi tiết
-      
+
+      const result = await createExaminationAppointment(payload);
+
+      const appointmentCode =
+        result?.maDatLich ??
+        result?.MaDatLich ??
+        result?.appointmentCode ??
+        result?.code ??
+        result?.data?.maDatLich ??
+        result?.data?.MaDatLich ??
+        result?.data?.appointmentCode ??
+        result?.data?.code ??
+        '';
+
+      if (!isGuest) {
+        navigate('/lich-hen');
+        return;
+      }
+
+      setSuccessMsg(
+        appointmentCode
+          ? `Đặt lịch thành công. Mã lịch của bạn: ${appointmentCode}. Hãy lưu mã này để tra cứu lịch hẹn.`
+          : 'Đặt lịch thành công. Vui lòng lưu thông tin lịch hẹn để tra cứu khi cần.'
+      );
+
+      setNote('');
     } catch (error) {
       setErrMsg(getApiErrorMessage(error, 'Không thể lưu lịch.'));
     } finally {
@@ -269,6 +393,12 @@ export default function DatLichKham({
       <h3 className="mb-3 fw-bold">ĐẶT LỊCH KHÁM</h3>
 
       {errMsg && <div className="alert alert-danger">{errMsg}</div>}
+      {successMsg && (
+        <div className="alert alert-success">
+          <div className="fw-semibold mb-1">Đặt lịch thành công</div>
+          <div>{successMsg}</div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="row g-3" noValidate>
         {/* Chuyên khoa */}
@@ -344,9 +474,35 @@ export default function DatLichKham({
             className="form-select"
             required
             value={selectedDoctor}
-            onChange={(e) => setSelectedDoctor(e.target.value)}
+            onChange={(e) => {
+              const doctorId = e.target.value;
+              setSelectedDoctor(doctorId);
+
+              // Khi chưa biết khám gì, chuyên khoa sẽ đi theo bác sĩ được chọn
+              // nếu hệ thống không có khoa Nội tổng quát cố định.
+              if (unknownCK && doctorId) {
+                const doctor = allDoctors.find(
+                  (item) =>
+                    String(getDoctorIdValue(item)) === String(doctorId)
+                );
+
+                const doctorCK = getDoctorSpecialtyId(doctor);
+
+                if (
+                  !Object.prototype.hasOwnProperty.call(departments, CK_GENERAL) &&
+                  doctorCK
+                ) {
+                  setSelectedCK(String(doctorCK));
+                }
+              }
+            }}
           >
             <option value="">-- Chọn --</option>
+            {filteredDoctors.length === 0 && (
+              <option value="" disabled>
+                Chưa có bác sĩ phù hợp
+              </option>
+            )}
             {filteredDoctors.map((doctor) => {
               const id = doctor.IDBacSi ?? doctor.id;
               const name = doctor.TenBacSi ?? doctor.doctorName ?? doctor.name;
@@ -359,24 +515,30 @@ export default function DatLichKham({
           </select>
         </div>
 
-        {/* Checkbox Đặt cho người khác */}
+        {/* Trạng thái người đặt */}
         <div className="col-12 mt-4">
-          <div className="form-check">
-            <input
-              type="checkbox"
-              id="forOther"
-              className="form-check-input"
-              checked={forOther}
-              onChange={(e) => setForOther(e.target.checked)}
-            />
-            <label className="form-check-label fw-bold" htmlFor="forOther">
-              Đặt cho người khác
-            </label>
-          </div>
+          {isGuest ? (
+            <div className="alert alert-info mb-0">
+              Bạn đang đặt lịch khi chưa đăng nhập. Vui lòng nhập thông tin người khám bên dưới.
+            </div>
+          ) : (
+            <div className="form-check">
+              <input
+                type="checkbox"
+                id="forOther"
+                className="form-check-input"
+                checked={forOther}
+                onChange={(e) => setForOther(e.target.checked)}
+              />
+              <label className="form-check-label fw-bold" htmlFor="forOther">
+                Đặt cho người khác
+              </label>
+            </div>
+          )}
         </div>
 
-        {/* KHỐI NHẬP THÔNG TIN (Chỉ hiển thị khi tích chọn Đặt cho người khác) */}
-        {forOther && (
+        {/* KHỐI NHẬP THÔNG TIN: khách chưa đăng nhập hoặc đặt cho người khác */}
+        {(forOther || isGuest) && (
           <div className="col-12">
             <div className="row g-3 p-3 border rounded bg-light">
               <div className="col-md-6">

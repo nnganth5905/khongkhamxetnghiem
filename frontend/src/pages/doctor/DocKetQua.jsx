@@ -68,20 +68,49 @@ export default function DocKetQua() {
     setMessage({ type: '', text: '' });
 
     try {
+      // Bước 1: duyệt kết quả xét nghiệm.
       await api.post(`/doctor/results/${id}/approve`, {
         conclusion: conclusion + (advice ? `\nLời khuyên: ${advice}` : ''),
       });
 
+      // Bước 2: tự tìm lượt khám liên quan từ resultId và hoàn tất ca khám.
+      // Frontend không cần biết hoặc tự truyền luotKhamId.
+      const completeResponse = await api.post(
+        `/doctor/results/${id}/complete-visit`
+      );
+
+      const completeData =
+        completeResponse?.data ?? completeResponse;
+
+      if (completeData?.completed === false) {
+        setMessage({
+          type: 'warning',
+          text:
+            completeData?.message ||
+            'Kết quả đã được duyệt nhưng ca khám chưa thể hoàn tất.',
+        });
+
+        // Nếu còn kết quả khác cần duyệt thì đưa bác sĩ về danh sách duyệt.
+        setTimeout(() => navigate('/doctor/duyet-ket-qua'), 1400);
+        return;
+      }
+
       setMessage({
         type: 'success',
-        text: 'Lưu kết luận và duyệt kết quả thành công!',
+        text:
+          completeData?.message ||
+          'Đã duyệt kết quả và hoàn tất ca khám thành công!',
       });
 
-      setTimeout(() => navigate('/doctor/duyet-ket-qua'), 800);
+      // Hoàn tất xong đưa về dashboard bác sĩ.
+      setTimeout(() => navigate('/doctor'), 1000);
     } catch (err) {
       setMessage({
         type: 'danger',
-        text: getApiErrorMessage(err, 'Không thể lưu kết luận đọc kết quả.'),
+        text: getApiErrorMessage(
+          err,
+          'Không thể duyệt kết quả hoặc hoàn tất ca khám.'
+        ),
       });
     } finally {
       setSubmitting(false);
@@ -277,7 +306,7 @@ export default function DocKetQua() {
 
             <div className="text-end">
               <button type="submit" className="btn btn-primary" disabled={submitting}>
-                {submitting ? 'Đang lưu...' : 'Lưu kết luận & duyệt'}
+                {submitting ? 'Đang xử lý...' : 'Duyệt kết quả & hoàn tất khám'}
               </button>
             </div>
           </form>

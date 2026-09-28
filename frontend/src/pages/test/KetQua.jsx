@@ -19,33 +19,36 @@ const normalizeResult = (item = {}) => ({
     item.IDKetQua,
 
   code:
-    item.type ?? // Hiển thị loại: KHÁM BỆNH hoặc XÉT NGHIỆM
     item.code ??
     item.maKetQua ??
+    item.id ??
     '—',
 
   testName:
-    item.title ?? // Thêm item.title từ Backend trả về
     item.testName ??
     item.tenXetNghiem ??
     '—',
 
   testDate:
-    // Format lại ngày tháng để hiển thị đẹp hơn nếu Backend trả về Timestamp
-    (item.date ? new Date(item.date).toLocaleString('vi-VN') : null) ?? 
-    item.testDate ??
-    item.ngayXetNghiem ??
-    '—',
+    item.testDate
+      ? new Date(item.testDate).toLocaleString('vi-VN')
+      : item.approvedAt
+      ? new Date(item.approvedAt).toLocaleString('vi-VN')
+      : item.date
+      ? new Date(item.date).toLocaleString('vi-VN')
+      : item.ngayXetNghiem ??
+        '—',
 
   doctorName:
     item.doctorName ??
+    item.examiningDoctorName ??
     item.tenBacSi ??
     '—',
 
   status:
     item.status ??
     item.trangThai ??
-    'Đã hoàn tất', // Mặc định vì danh sách này chỉ lấy những ca đã duyệt xong
+    'APPROVED',
 
   abnormal: Boolean(
     item.abnormal ??
@@ -67,11 +70,9 @@ export default function KetQua() {
       setLoading(true);
       setError('');
 
-      const data =
-        await getMyResults({
-          status:
-            status || undefined,
-        });
+      const data = await getMyResults({
+        status: status || undefined,
+      });
 
       const list = Array.isArray(data)
         ? data
@@ -80,9 +81,7 @@ export default function KetQua() {
           data?.data ||
           [];
 
-      setResults(
-        list.map(normalizeResult)
-      );
+      setResults(list.map(normalizeResult));
     } catch (err) {
       setError(
         getApiErrorMessage(
@@ -99,45 +98,38 @@ export default function KetQua() {
     loadResults();
   }, [status]);
 
-  const filteredResults =
-    useMemo(() => {
-      const q =
-        keyword
-          .trim()
-          .toLowerCase();
+  const filteredResults = useMemo(() => {
+    const q = keyword
+      .trim()
+      .toLowerCase();
 
-      if (!q) {
-        return results;
-      }
+    if (!q) {
+      return results;
+    }
 
-      return results.filter((item) =>
-        [
-          item.code,
-          item.testName,
-          item.doctorName,
-        ]
-          .join(' ')
-          .toLowerCase()
-          .includes(q)
-      );
-    }, [results, keyword]);
+    return results.filter((item) =>
+      [
+        item.code,
+        item.testName,
+        item.doctorName,
+      ]
+        .join(' ')
+        .toLowerCase()
+        .includes(q)
+    );
+  }, [results, keyword]);
 
   return (
     <div className="bg-light min-vh-100 py-5">
       <div
         className="container"
-        style={{
-          maxWidth: 1100,
-        }}
+        style={{ maxWidth: 1100 }}
       >
         <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
           <div>
             <h1
               className="fw-bold mb-1"
-              style={{
-                color:
-                  'var(--primary)',
-              }}
+              style={{ color: 'var(--primary)' }}
             >
               Kết quả xét nghiệm
             </h1>
@@ -174,9 +166,7 @@ export default function KetQua() {
                   placeholder="Tìm mã kết quả, tên xét nghiệm, bác sĩ..."
                   value={keyword}
                   onChange={(e) =>
-                    setKeyword(
-                      e.target.value
-                    )
+                    setKeyword(e.target.value)
                   }
                 />
               </div>
@@ -186,25 +176,14 @@ export default function KetQua() {
                   className="form-select"
                   value={status}
                   onChange={(e) =>
-                    setStatus(
-                      e.target.value
-                    )
+                    setStatus(e.target.value)
                   }
                 >
                   <option value="">
                     Tất cả trạng thái
                   </option>
-
-                  <option value="PENDING">
-                    Đang xử lý
-                  </option>
-
                   <option value="APPROVED">
                     Đã duyệt
-                  </option>
-
-                  <option value="COMPLETED">
-                    Hoàn tất
                   </option>
                 </select>
               </div>
@@ -217,37 +196,14 @@ export default function KetQua() {
                 <table className="table table-hover align-middle">
                   <thead className="table-light">
                     <tr>
-                      <th>
-                        #
-                      </th>
-
-                      <th>
-                        Mã kết quả
-                      </th>
-
-                      <th>
-                        Xét nghiệm
-                      </th>
-
-                      <th>
-                        Ngày xét nghiệm
-                      </th>
-
-                      <th>
-                        Bác sĩ
-                      </th>
-
-                      <th>
-                        Đánh giá
-                      </th>
-
-                      <th>
-                        Trạng thái
-                      </th>
-
-                      <th className="text-end">
-                        Thao tác
-                      </th>
+                      <th>#</th>
+                      <th>Mã kết quả</th>
+                      <th>Xét nghiệm</th>
+                      <th>Ngày xét nghiệm</th>
+                      <th>Bác sĩ</th>
+                      <th>Đánh giá</th>
+                      <th>Trạng thái</th>
+                      <th>Thao tác</th>
                     </tr>
                   </thead>
 
@@ -255,47 +211,32 @@ export default function KetQua() {
                     {filteredResults.length > 0 ? (
                       filteredResults.map((item, index) => (
                         <tr key={item.id ?? index}>
-                          <td>
-                            {index + 1}
-                          </td>
-
+                          <td>{index + 1}</td>
                           <td className="fw-semibold">
                             {item.code}
                           </td>
-
-                          <td>
-                            {item.testName}
-                          </td>
-
-                          <td>
-                            {item.testDate}
-                          </td>
-
-                          <td>
-                            {item.doctorName}
-                          </td>
-
+                          <td>{item.testName}</td>
+                          <td>{item.testDate}</td>
+                          <td>{item.doctorName}</td>
                           <td>
                             {item.abnormal ? (
-                              <span className="badge bg-danger-subtle text-danger">
-                                Có bất thường
+                              <span className="badge bg-danger">
+                                Bất thường
                               </span>
                             ) : (
-                              <span className="badge bg-success-subtle text-success">
+                              <span className="badge bg-success">
                                 Trong ngưỡng
                               </span>
                             )}
                           </td>
-
                           <td>
                             <span className="badge bg-primary-subtle text-primary">
                               {item.status}
                             </span>
                           </td>
-
-                          <td className="text-end">
+                          <td>
                             <Link
-                              to={`/ket-qua/${item.id}`}
+                              to={`/customer/ket-qua/${item.id}`}
                               className="btn btn-sm btn-primary"
                             >
                               <i className="fa-solid fa-eye me-2" />

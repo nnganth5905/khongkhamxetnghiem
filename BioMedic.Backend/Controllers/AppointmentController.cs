@@ -436,29 +436,18 @@ namespace BioMedic.Backend.Controllers
                 return BadRequest(new { success = false, message = "Cơ sở tiếp nhận không tồn tại." });
             }
 
-            var customer = await _context.Khachhangs.FirstOrDefaultAsync(existing =>
-                existing.TenKhachHang == customerName &&
-                existing.SoDienThoai == phone &&
-                existing.GioiTinh == gender &&
-                existing.NgaySinh == birthDate);
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
 
-            await using var transaction = await _context.Database.BeginTransactionAsync();
+            var customer = await ResolveCustomerForAppointment(
+                customerName,
+                request.Email,
+                phone,
+                gender,
+                birthDate,
+                userId);
 
-            if (customer is null)
-            {
-                customer = new Khachhang
-                {
-                    IdkhachHang = $"KH{Guid.NewGuid():N}"[..10].ToUpperInvariant(),
-                    TenKhachHang = customerName,
-                    Email = request.Email?.Trim(),
-                    SoDienThoai = phone,
-                    GioiTinh = gender,
-                    NgaySinh = birthDate,
-                    Status = "yes",
-                };
-                _context.Khachhangs.Add(customer);
-                await _context.SaveChangesAsync();
-            }
+            await _context.SaveChangesAsync();
 
             var appointment = new Datlichxetnghiem
             {
@@ -579,29 +568,26 @@ namespace BioMedic.Backend.Controllers
                 birthDate = parsedBirthDate;
             }
 
-            var customer = await _context.Khachhangs.FirstOrDefaultAsync(existing =>
-                existing.TenKhachHang == customerName &&
-                existing.SoDienThoai == phone &&
-                existing.GioiTinh == gender &&
-                existing.NgaySinh == birthDate);
-
-            await using var transaction = await _context.Database.BeginTransactionAsync();
-
-            if (customer is null)
+            int? userId = null;
+            if (int.TryParse(
+                User.FindFirstValue("userId"),
+                out var authenticatedUserId))
             {
-                customer = new Khachhang
-                {
-                    IdkhachHang = $"KH{Guid.NewGuid():N}"[..10].ToUpperInvariant(),
-                    TenKhachHang = customerName,
-                    Email = request.Email?.Trim(),
-                    SoDienThoai = phone,
-                    GioiTinh = gender,
-                    NgaySinh = birthDate,
-                    Status = "yes",
-                };
-                _context.Khachhangs.Add(customer);
-                await _context.SaveChangesAsync();
+                userId = authenticatedUserId;
             }
+
+            await using var transaction =
+                await _context.Database.BeginTransactionAsync();
+
+            var customer = await ResolveCustomerForAppointment(
+                customerName,
+                request.Email,
+                phone,
+                gender,
+                birthDate,
+                userId);
+
+            await _context.SaveChangesAsync();
 
             var hasExamConflict = await _context.Datlichkhams.AnyAsync(existing =>
                 existing.IdkhachHang == customer.IdkhachHang &&
@@ -627,7 +613,7 @@ namespace BioMedic.Backend.Controllers
             var appointment = new Datlichkham
             {
                 MaDatLich = $"DLK-{Guid.NewGuid():N}"[..10].ToUpperInvariant(),
-                UserId = int.TryParse(User.FindFirstValue("userId"), out var userId) ? userId : null,
+                UserId = userId,
                 IdkhachHang = customer.IdkhachHang,
                 IdchuyenKhoa = specialtyId,
                 IdbacSi = doctorId,
@@ -808,6 +794,162 @@ namespace BioMedic.Backend.Controllers
             await _context.SaveChangesAsync();
             await transaction.CommitAsync();
             return Ok(new { message = "Hủy lịch hẹn thành công.", maDatLich = id });
+        }
+
+
+        private async Task<Khachhang> ResolveCustomerForAppointment(
+            string customerName,
+            string? emailValue,
+            string phone,
+            string gender,
+            DateOnly? birthDate,
+            int? userId)
+        {
+            var email = string.IsNullOrWhiteSpace(emailValue)
+                ? null
+                : emailValue.Trim().ToLowerInvariant();
+
+            // A. Nếu đã đăng nhập, luôn ưu tiên IDKhachHang đang gắn với tài khoản.
+            // Đây là khóa chính giúp toàn bộ lịch khám/xét nghiệm/kết quả
+            // đi về đúng một hồ sơ bệnh nhân.
+            if (userId.HasValue)
+            {
+                var linkedCustomerId = await _context.Users
+                    .AsNoTracking()
+                    .Where(x =>
+                        x.UserId == userId.Value &&
+                        x.IsActive == true)
+                    .Select(x => x.IdkhachHang)
+                    .FirstOrDefaultAsync();
+
+                if (!string.IsNullOrWhiteSpace(linkedCustomerId))
+                {
+                    var linkedCustomer = await _context.Khachhangs
+                        .FirstOrDefaultAsync(x =>
+                            x.IdkhachHang == linkedCustomerId);
+
+                    if (linkedCustomer is not null)
+                    {
+                        UpdateCustomerProfile(
+                            linkedCustomer,
+                            customerName,
+                            email,
+                            phone,
+                            gender,
+                            birthDate);
+
+                        return linkedCustomer;
+                    }
+                }
+            }
+
+            // B. Khách chưa đăng nhập: ưu tiên email vì email thường duy nhất.
+            Khachhang? customer = null;
+
+            if (!string.IsNullOrWhiteSpace(email))
+            {
+                customer = await _context.Khachhangs
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync(x =>
+                        x.Email != null &&
+                        x.Email.ToLower() == email);
+            }
+
+            // C. Nếu không có email trùng thì tìm theo số điện thoại.
+            if (customer is null &&
+                !string.IsNullOrWhiteSpace(phone))
+            {
+                customer = await _context.Khachhangs
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync(x =>
+                        x.SoDienThoai == phone);
+            }
+
+            // D. Fallback tương thích dữ liệu cũ.
+            if (customer is null)
+            {
+                customer = await _context.Khachhangs
+                    .OrderByDescending(x => x.CreatedAt)
+                    .FirstOrDefaultAsync(x =>
+                        x.TenKhachHang == customerName &&
+                        x.SoDienThoai == phone &&
+                        x.GioiTinh == gender &&
+                        x.NgaySinh == birthDate);
+            }
+
+            if (customer is not null)
+            {
+                UpdateCustomerProfile(
+                    customer,
+                    customerName,
+                    email,
+                    phone,
+                    gender,
+                    birthDate);
+
+                return customer;
+            }
+
+            // E. Chỉ sinh ID mới nếu hệ thống chưa có hồ sơ bệnh nhân phù hợp.
+            var created = new Khachhang
+            {
+                IdkhachHang =
+                    $"KH{Guid.NewGuid():N}"[..10].ToUpperInvariant(),
+                TenKhachHang = customerName,
+                Email = email,
+                SoDienThoai = phone,
+                GioiTinh = gender,
+                NgaySinh = birthDate,
+                Status = "yes",
+                CreatedAt = DateTime.Now,
+            };
+
+            _context.Khachhangs.Add(created);
+
+            // Nếu request có đăng nhập nhưng tài khoản chưa được gắn IDKhachHang,
+            // tự liên kết ngay để những lần sau luôn dùng cùng ID.
+            if (userId.HasValue)
+            {
+                var account = await _context.Users
+                    .FirstOrDefaultAsync(x =>
+                        x.UserId == userId.Value);
+
+                if (account is not null &&
+                    string.IsNullOrWhiteSpace(account.IdkhachHang))
+                {
+                    account.IdkhachHang = created.IdkhachHang;
+                    account.UpdatedAt = DateTime.Now;
+                }
+            }
+
+            return created;
+        }
+
+        private static void UpdateCustomerProfile(
+            Khachhang customer,
+            string customerName,
+            string? email,
+            string phone,
+            string gender,
+            DateOnly? birthDate)
+        {
+            if (!string.IsNullOrWhiteSpace(customerName))
+                customer.TenKhachHang = customerName;
+
+            if (!string.IsNullOrWhiteSpace(email))
+                customer.Email = email;
+
+            if (!string.IsNullOrWhiteSpace(phone))
+                customer.SoDienThoai = phone;
+
+            if (!string.IsNullOrWhiteSpace(gender))
+                customer.GioiTinh = gender;
+
+            if (birthDate.HasValue)
+                customer.NgaySinh = birthDate;
+
+            customer.Status = "yes";
+            customer.UpdatedAt = DateTime.Now;
         }
 
         private async Task<bool> CanAccessAppointment(int? appointmentUserId, string customerId)
