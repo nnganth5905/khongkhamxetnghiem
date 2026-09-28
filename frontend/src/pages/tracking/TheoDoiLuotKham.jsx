@@ -1,139 +1,436 @@
-import React, { useState } from 'react';
+// src/pages/tracking/TheoDoiLuotKham.jsx
+
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  useSearchParams,
+} from 'react-router-dom';
 
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
-import StatusTimeline from '../../components/StatusTimeline';
 
-import { getVisitTracking } from '../../services/trackingService';
-import { getApiErrorMessage } from '../../services/api';
+import {
+  getMyVisits,
+  getVisitTracking,
+  getTrackingStatusLabel,
+  getTrackingEventLabel,
+  normalizeTimeline,
+} from '../../services/trackingService';
 
-const DEFAULT_STEPS = [
-  { title: 'Đặt lịch thành công' },
-  { title: 'Đã tiếp nhận' },
-  { title: 'Đang chờ khám' },
-  { title: 'Đang khám' },
-  { title: 'Đã chỉ định xét nghiệm' },
-  { title: 'Đang chờ kết quả' },
-  { title: 'Bác sĩ đọc kết quả' },
-  { title: 'Hoàn tất' },
-];
+import {
+  getApiErrorMessage,
+} from '../../services/api';
 
-const normalizeTracking = (data = {}, code = '') => ({
-  code:
-    data.code ??
-    data.maLuotKham ??
-    data.MaLuotKham ??
-    code,
+// ============================================================
+// FORMAT
+// ============================================================
 
-  patientName:
-    data.patientName ??
-    data.tenKhachHang ??
-    data.TenKhachHang ??
-    '—',
+const formatDate = (value) => {
+  if (!value) {
+    return '—';
+  }
 
-  doctorName:
-    data.doctorName ??
-    data.tenBacSi ??
-    data.TenBacSi ??
-    '—',
+  const text =
+    String(value).substring(0, 10);
 
-  roomName:
-    data.roomName ??
-    data.tenPhong ??
-    data.TenPhong ??
-    '—',
+  const parts =
+    text.split('-');
 
-  status:
-    data.status ??
-    data.trangThai ??
-    data.TrangThai ??
-    '—',
+  if (parts.length !== 3) {
+    return text;
+  }
 
-  appointmentDate:
-    data.appointmentDate ??
-    data.ngayHen ??
-    data.NgayHen ??
-    '—',
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+};
 
-  appointmentTime:
-    data.appointmentTime ??
-    data.gioHen ??
-    data.GioHen ??
-    '—',
+const formatTime = (value) => {
+  if (!value) {
+    return '—';
+  }
 
-  currentStep: Number(
-    data.currentStep ??
-    data.stepIndex ??
-    data.buocHienTai ??
-    0
-  ),
+  const text =
+    String(value);
 
-  steps:
-    Array.isArray(data.steps) && data.steps.length > 0
-      ? data.steps
-      : Array.isArray(data.timeline) && data.timeline.length > 0
-      ? data.timeline
-      : DEFAULT_STEPS,
-});
+  if (
+    text.includes('T') ||
+    text.includes(' ')
+  ) {
+    const date =
+      new Date(text);
+
+    if (!Number.isNaN(date.getTime())) {
+      return date.toLocaleTimeString(
+        'vi-VN',
+        {
+          hour: '2-digit',
+          minute: '2-digit',
+        }
+      );
+    }
+  }
+
+  return text.substring(0, 5);
+};
+
+const formatDateTime = (value) => {
+  if (!value) {
+    return '—';
+  }
+
+  const date =
+    new Date(value);
+
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleString(
+      'vi-VN',
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }
+    );
+  }
+
+  return String(value);
+};
+
+// ============================================================
+// STATUS
+// ============================================================
+
+const statusClass = (status) => {
+  const value =
+    String(status || '')
+      .toLowerCase();
+
+  switch (value) {
+    case 'da_tiep_nhan':
+      return 'bg-primary-subtle text-primary';
+
+    case 'cho_kham':
+      return 'bg-warning-subtle text-warning-emphasis';
+
+    case 'da_den_luot':
+      return 'bg-info-subtle text-info-emphasis';
+
+    case 'cho_goi_lai':
+      return 'bg-secondary-subtle text-secondary';
+
+    case 'dang_kham':
+      return 'bg-primary text-white';
+
+    case 'da_chi_dinh_xn':
+      return 'bg-warning text-dark';
+
+    case 'moi_doc_kq':
+      return 'bg-info text-dark';
+
+    case 'dang_tu_van_kq':
+      return 'bg-info-subtle text-info-emphasis';
+
+    case 'hoan_tat':
+      return 'bg-success text-white';
+
+    case 'bo_luot':
+      return 'bg-danger-subtle text-danger';
+
+    default:
+      return 'bg-secondary-subtle text-secondary';
+  }
+};
+
+// ============================================================
+// TIMELINE ICON
+// ============================================================
+
+const getEventIcon = (code) => {
+  switch (
+    String(code || '').toUpperCase()
+  ) {
+    case 'BOOKED':
+      return 'fa-calendar-check';
+
+    case 'APPOINTMENT_RESCHEDULED':
+      return 'fa-calendar-days';
+
+    case 'APPOINTMENT_CANCELLED':
+      return 'fa-calendar-xmark';
+
+    case 'CHECKED_IN':
+      return 'fa-clipboard-check';
+
+    case 'CALLED':
+      return 'fa-bell';
+
+    case 'SKIPPED':
+      return 'fa-clock-rotate-left';
+
+    case 'EXAM_STARTED':
+      return 'fa-user-doctor';
+
+    case 'EXAM_COMPLETED':
+      return 'fa-circle-check';
+
+    case 'SPECIMEN_COLLECTED':
+      return 'fa-vial';
+
+    case 'RESULT_AVAILABLE':
+      return 'fa-file-medical';
+
+    default:
+      return 'fa-circle';
+  }
+};
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export default function TheoDoiLuotKham() {
-  const [code, setCode] = useState('');
-  const [tracking, setTracking] = useState(null);
+  const [
+    searchParams,
+    setSearchParams,
+  ] = useSearchParams();
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+  const queryId =
+    searchParams.get('id') || '';
 
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const [visits, setVisits] =
+    useState([]);
 
-    const value = code.trim();
+  const [selectedId, setSelectedId] =
+    useState(queryId);
 
-    if (!value) {
-      setError('Vui lòng nhập mã lượt khám.');
+  const [tracking, setTracking] =
+    useState(null);
+
+  const [keyword, setKeyword] =
+    useState('');
+
+  const [loadingList, setLoadingList] =
+    useState(true);
+
+  const [loadingDetail, setLoadingDetail] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState({
+      type: '',
+      text: '',
+    });
+
+  // ==========================================================
+  // LOAD MY VISITS
+  // ==========================================================
+
+  const loadVisits = async () => {
+    try {
+      setLoadingList(true);
+
+      const data =
+        await getMyVisits();
+
+      setVisits(
+        Array.isArray(data)
+          ? data
+          : []
+      );
+    } catch (err) {
+      /*
+       * Không coi đây là lỗi fatal.
+       * Nhân viên nội bộ vẫn có thể nhập mã lượt trực tiếp.
+       */
+      setVisits([]);
+
+      const status =
+        err?.response?.status;
+
+      if (
+        status !== 401 &&
+        status !== 403
+      ) {
+        setMessage({
+          type: 'danger',
+          text: getApiErrorMessage(
+            err,
+            'Không thể tải danh sách lượt khám.'
+          ),
+        });
+      }
+    } finally {
+      setLoadingList(false);
+    }
+  };
+
+  // ==========================================================
+  // LOAD DETAIL
+  // ==========================================================
+
+  const loadTracking = async (id) => {
+    const normalizedId =
+      String(id || '').trim();
+
+    if (!normalizedId) {
+      setTracking(null);
       return;
     }
 
     try {
-      setLoading(true);
-      setError('');
+      setLoadingDetail(true);
+
+      setMessage({
+        type: '',
+        text: '',
+      });
+
+      const data =
+        await getVisitTracking(
+          normalizedId
+        );
+
+      setTracking({
+        ...data,
+
+        timeline:
+          normalizeTimeline(
+            data?.timeline || []
+          ),
+      });
+
+      setSelectedId(
+        normalizedId
+      );
+
+      setSearchParams({
+        id: normalizedId,
+      });
+    } catch (err) {
       setTracking(null);
 
-      const data = await getVisitTracking(value);
-
-      setTracking(
-        normalizeTracking(data, value)
-      );
-    } catch (err) {
-      setError(
-        getApiErrorMessage(
+      setMessage({
+        type: 'danger',
+        text: getApiErrorMessage(
           err,
-          'Không tìm thấy lượt khám hoặc không thể tải tiến trình.'
-        )
-      );
+          'Không thể tải thông tin lượt khám.'
+        ),
+      });
     } finally {
-      setLoading(false);
+      setLoadingDetail(false);
     }
   };
 
+  // ==========================================================
+  // EFFECT
+  // ==========================================================
+
+  useEffect(() => {
+    loadVisits();
+  }, []);
+
+  useEffect(() => {
+    if (queryId) {
+      loadTracking(
+        queryId
+      );
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryId]);
+
+  // ==========================================================
+  // FILTER
+  // ==========================================================
+
+  const filteredVisits =
+    useMemo(() => {
+      const q =
+        keyword
+          .trim()
+          .toLowerCase();
+
+      if (!q) {
+        return visits;
+      }
+
+      return visits.filter(
+        (item) =>
+          [
+            item.id,
+            item.appointmentId,
+            item.doctorName,
+            item.roomName,
+            item.status,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+      );
+    }, [
+      visits,
+      keyword,
+    ]);
+
+  // ==========================================================
+  // SEARCH
+  // ==========================================================
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+
+    if (!selectedId.trim()) {
+      setMessage({
+        type: 'warning',
+        text:
+          'Vui lòng nhập mã lượt khám hoặc mã đặt lịch.',
+      });
+
+      return;
+    }
+
+    loadTracking(
+      selectedId
+    );
+  };
+
+  // ==========================================================
+  // RENDER
+  // ==========================================================
+
   return (
-    <div>
+    <div className="container-fluid py-4">
       <div className="mb-4">
         <h1 className="dashboard-page-title mb-1">
           Theo dõi lượt khám
         </h1>
 
         <p className="text-secondary mb-0">
-          Theo dõi trạng thái từ lúc tiếp nhận đến khi hoàn tất lượt khám.
+          Theo dõi toàn bộ tiến trình khám bệnh từ lúc đặt lịch,
+          check-in đến khi hoàn tất.
         </p>
       </div>
 
-      {error && (
+      {message.text && (
         <Notification
-          type="danger"
-          message={error}
-          onClose={() => setError('')}
+          type={message.type}
+          message={message.text}
+          onClose={() =>
+            setMessage({
+              type: '',
+              text: '',
+            })
+          }
         />
       )}
+
+      {/* =====================================================
+          SEARCH
+      ====================================================== */}
 
       <div className="card border-0 shadow-sm rounded-4 mb-4">
         <div className="card-body p-4">
@@ -143,150 +440,427 @@ export default function TheoDoiLuotKham() {
           >
             <div className="col-lg-9">
               <label className="form-label fw-semibold">
-                Mã lượt khám
+                Mã lượt khám / mã đặt lịch
               </label>
 
-              <div className="input-group">
-                <span className="input-group-text bg-white">
-                  <i className="fa-solid fa-magnifying-glass text-secondary" />
-                </span>
-
-                <input
-                  type="search"
-                  className="form-control"
-                  placeholder="Ví dụ: LK000123"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                />
-              </div>
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Ví dụ: 12 hoặc DLK..."
+                value={selectedId}
+                onChange={(e) =>
+                  setSelectedId(
+                    e.target.value
+                  )
+                }
+              />
             </div>
 
             <div className="col-lg-3">
               <button
                 type="submit"
                 className="btn btn-primary w-100"
-                disabled={loading}
+                disabled={loadingDetail}
               >
-                <i className="fa-solid fa-route me-2" />
-                Theo dõi
+                <i className="fa-solid fa-magnifying-glass me-2" />
+
+                {loadingDetail
+                  ? 'Đang tìm...'
+                  : 'Theo dõi'}
               </button>
             </div>
           </form>
         </div>
       </div>
 
-      {loading && (
-        <Loading text="Đang tải tiến trình lượt khám..." />
-      )}
+      {/* =====================================================
+          MY VISITS
+      ====================================================== */}
 
-      {!loading && tracking && (
-        <div className="row g-4">
-          <div className="col-lg-4">
-            <div className="card border-0 shadow-sm rounded-4 h-100">
-              <div className="card-body p-4">
-                <div
-                  className="d-inline-flex align-items-center justify-content-center rounded-circle mb-3"
-                  style={{
-                    width: 52,
-                    height: 52,
-                    background: '#eaf2ff',
-                    color: 'var(--primary)',
-                  }}
-                >
-                  <i className="fa-solid fa-stethoscope" />
-                </div>
-
-                <h5 className="fw-bold mb-4">
-                  Thông tin lượt khám
-                </h5>
-
-                <div className="mb-3">
-                  <div className="small text-secondary">
-                    Mã lượt khám
-                  </div>
-
-                  <div className="fw-semibold">
-                    {tracking.code}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <div className="small text-secondary">
-                    Người bệnh
-                  </div>
-
-                  <div className="fw-semibold">
-                    {tracking.patientName}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <div className="small text-secondary">
-                    Bác sĩ
-                  </div>
-
-                  <div className="fw-semibold">
-                    {tracking.doctorName}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <div className="small text-secondary">
-                    Phòng
-                  </div>
-
-                  <div className="fw-semibold">
-                    {tracking.roomName}
-                  </div>
-                </div>
-
-                <div className="mb-3">
-                  <div className="small text-secondary">
-                    Thời gian hẹn
-                  </div>
-
-                  <div className="fw-semibold">
-                    {tracking.appointmentDate}
-                    {tracking.appointmentTime !== '—'
-                      ? ` • ${tracking.appointmentTime}`
-                      : ''}
-                  </div>
-                </div>
-
+      {!loadingList &&
+        visits.length > 0 && (
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-3">
                 <div>
-                  <div className="small text-secondary">
-                    Trạng thái hiện tại
-                  </div>
+                  <h5 className="fw-bold mb-1">
+                    Lượt khám của bạn
+                  </h5>
 
-                  <span className="badge bg-primary mt-1">
-                    {tracking.status}
-                  </span>
+                  <div className="small text-secondary">
+                    Chọn một lượt để xem tiến trình.
+                  </div>
                 </div>
+
+                <input
+                  type="search"
+                  className="form-control"
+                  style={{
+                    maxWidth: 320,
+                  }}
+                  placeholder="Tìm mã lịch, bác sĩ..."
+                  value={keyword}
+                  onChange={(e) =>
+                    setKeyword(
+                      e.target.value
+                    )
+                  }
+                />
+              </div>
+
+              <div className="table-responsive">
+                <table className="table table-hover align-middle mb-0">
+                  <thead className="table-light">
+                    <tr>
+                      <th>Mã lịch</th>
+                      <th>Ngày</th>
+                      <th>Giờ</th>
+                      <th>Bác sĩ</th>
+                      <th>Phòng</th>
+                      <th>STT</th>
+                      <th>Trạng thái</th>
+                      <th />
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {filteredVisits.map(
+                      (item) => (
+                        <tr key={item.id}>
+                          <td className="fw-semibold text-primary">
+                            {item.appointmentId ||
+                              item.id}
+                          </td>
+
+                          <td>
+                            {formatDate(
+                              item.date
+                            )}
+                          </td>
+
+                          <td>
+                            {formatTime(
+                              item.time
+                            )}
+                          </td>
+
+                          <td>
+                            {item.doctorName ||
+                              '—'}
+                          </td>
+
+                          <td>
+                            {item.roomName ||
+                              '—'}
+                          </td>
+
+                          <td>
+                            {item.queueNumber ??
+                              '—'}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`badge ${statusClass(
+                                item.status
+                              )}`}
+                            >
+                              {getTrackingStatusLabel(
+                                item.status
+                              )}
+                            </span>
+                          </td>
+
+                          <td className="text-end">
+                            <button
+                              type="button"
+                              className="btn btn-sm btn-outline-primary"
+                              onClick={() =>
+                                loadTracking(
+                                  item.id
+                                )
+                              }
+                            >
+                              Xem tiến trình
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
           </div>
+        )}
 
-          <div className="col-lg-8">
-            <div className="card border-0 shadow-sm rounded-4">
-              <div className="card-body p-4">
-                <h5 className="fw-bold mb-4">
-                  Tiến trình lượt khám
-                </h5>
+      {loadingList &&
+        !tracking && (
+          <Loading text="Đang tải lượt khám..." />
+        )}
 
-                <StatusTimeline
-                  steps={tracking.steps}
-                  currentStep={tracking.currentStep}
+      {/* =====================================================
+          DETAIL
+      ====================================================== */}
+
+      {loadingDetail ? (
+        <Loading text="Đang tải tiến trình khám..." />
+      ) : tracking ? (
+        <>
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <div className="d-flex flex-wrap justify-content-between align-items-start gap-3">
+                <div>
+                  <div className="small text-secondary">
+                    Mã đặt lịch
+                  </div>
+
+                  <h4 className="fw-bold text-primary mb-1">
+                    {tracking.appointmentId ||
+                      '—'}
+                  </h4>
+
+                  <div className="text-secondary">
+                    Lượt khám #{tracking.id}
+                  </div>
+                </div>
+
+                <span
+                  className={`badge fs-6 ${statusClass(
+                    tracking.status
+                  )}`}
+                >
+                  {getTrackingStatusLabel(
+                    tracking.status
+                  )}
+                </span>
+              </div>
+
+              <hr />
+
+              <div className="row g-3">
+                <Info
+                  label="Người bệnh"
+                  value={
+                    tracking.customerName
+                  }
+                />
+
+                <Info
+                  label="Mã khách hàng"
+                  value={
+                    tracking.patientCode
+                  }
+                />
+
+                <Info
+                  label="Ngày khám"
+                  value={formatDate(
+                    tracking.date
+                  )}
+                />
+
+                <Info
+                  label="Giờ khám"
+                  value={formatTime(
+                    tracking.time
+                  )}
+                />
+
+                <Info
+                  label="Bác sĩ"
+                  value={
+                    tracking.doctorName
+                  }
+                />
+
+                <Info
+                  label="Phòng"
+                  value={
+                    tracking.roomName
+                  }
+                />
+
+                <Info
+                  label="Số thứ tự"
+                  value={
+                    tracking.queueNumber
+                  }
+                />
+
+                <Info
+                  label="Check-in"
+                  value={formatDateTime(
+                    tracking.receivedAt
+                  )}
                 />
               </div>
             </div>
           </div>
-        </div>
-      )}
 
-      {!loading && !tracking && !error && (
-        <div className="alert alert-light border text-center">
-          Nhập mã lượt khám để xem tiến trình.
-        </div>
+          {/* TIMELINE */}
+
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-4">
+                Tiến trình khám bệnh
+              </h5>
+
+              <Timeline
+                items={
+                  tracking.timeline ||
+                  []
+                }
+              />
+            </div>
+          </div>
+        </>
+      ) : (
+        !loadingList && (
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body text-center py-5 text-secondary">
+              <i className="fa-solid fa-stethoscope fs-1 mb-3 d-block opacity-50" />
+
+              Chọn một lượt khám hoặc nhập mã để xem tiến trình.
+            </div>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ============================================================
+// INFO
+// ============================================================
+
+function Info({
+  label,
+  value,
+}) {
+  return (
+    <div className="col-md-6 col-xl-3">
+      <div className="small text-secondary mb-1">
+        {label}
+      </div>
+
+      <div className="fw-semibold">
+        {value ??
+          '—'}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// TIMELINE
+// ============================================================
+
+function Timeline({
+  items = [],
+}) {
+  if (!items.length) {
+    return (
+      <div className="text-center text-secondary py-4">
+        Chưa có dữ liệu tiến trình.
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {items.map(
+        (item, index) => (
+          <div
+            key={
+              item.id ||
+              `${item.time}-${index}`
+            }
+            className="d-flex gap-3"
+          >
+            <div
+              className="d-flex flex-column align-items-center"
+              style={{
+                width: 42,
+              }}
+            >
+              <div
+                className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center flex-shrink-0"
+                style={{
+                  width: 36,
+                  height: 36,
+                }}
+              >
+                <i
+                  className={`fa-solid ${getEventIcon(
+                    item.code
+                  )}`}
+                />
+              </div>
+
+              {index <
+                items.length - 1 && (
+                <div
+                  className="bg-secondary-subtle"
+                  style={{
+                    width: 2,
+                    minHeight: 70,
+                    flex: 1,
+                  }}
+                />
+              )}
+            </div>
+
+            <div className="pb-4 flex-grow-1">
+              <div className="d-flex flex-wrap justify-content-between gap-2">
+                <div className="fw-bold">
+                  {getTrackingEventLabel(
+                    item.code,
+                    item.event
+                  )}
+                </div>
+
+                <small className="text-secondary">
+                  {formatDateTime(
+                    item.time
+                  )}
+                </small>
+              </div>
+
+              {item.description && (
+                <div className="text-secondary small mt-1">
+                  {item.description}
+                </div>
+              )}
+
+              {(item.oldStatus ||
+                item.newStatus) && (
+                <div className="small mt-2">
+                  {item.oldStatus && (
+                    <span className="badge bg-secondary-subtle text-secondary me-2">
+                      {getTrackingStatusLabel(
+                        item.oldStatus
+                      )}
+                    </span>
+                  )}
+
+                  {item.oldStatus &&
+                    item.newStatus && (
+                      <i className="fa-solid fa-arrow-right text-secondary me-2" />
+                    )}
+
+                  {item.newStatus && (
+                    <span className="badge bg-primary-subtle text-primary">
+                      {getTrackingStatusLabel(
+                        item.newStatus
+                      )}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        )
       )}
     </div>
   );

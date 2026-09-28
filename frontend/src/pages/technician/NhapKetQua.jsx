@@ -1,4 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
+
 import {
   Link,
   useParams,
@@ -13,246 +17,452 @@ import {
   submitResultEntry,
 } from '../../services/technicianService';
 
-import { getApiErrorMessage } from '../../services/api';
+import {
+  getApiErrorMessage,
+} from '../../services/api';
+
+const evaluationLabel = (
+  evaluation,
+) => {
+  switch (
+    String(
+      evaluation ||
+      '',
+    ).toLowerCase()
+  ) {
+    case 'binh_thuong':
+      return 'Bình thường';
+
+    case 'thap':
+      return 'Thấp';
+
+    case 'cao':
+      return 'Cao';
+
+    case 'bat_thuong':
+      return 'Bất thường';
+
+    default:
+      return 'Chưa đánh giá';
+  }
+};
+
+const evaluationClass = (
+  evaluation,
+) => {
+  switch (
+    String(
+      evaluation ||
+      '',
+    ).toLowerCase()
+  ) {
+    case 'binh_thuong':
+      return 'bg-success-subtle text-success';
+
+    case 'thap':
+    case 'cao':
+    case 'bat_thuong':
+      return 'bg-danger-subtle text-danger';
+
+    default:
+      return 'bg-secondary-subtle text-secondary';
+  }
+};
 
 export default function NhapKetQua() {
-  const { worklistId } = useParams();
+  const {
+    worklistId,
+  } = useParams();
 
-  const [workInfo, setWorkInfo] = useState(null);
-  const [indicators, setIndicators] = useState([]);
-  const [notes, setNotes] = useState('');
+  const [
+    workInfo,
+    setWorkInfo,
+  ] = useState(null);
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [
+    indicators,
+    setIndicators,
+  ] = useState([]);
 
-  const [message, setMessage] = useState({
+  const [
+    generalResult,
+    setGeneralResult,
+  ] = useState('');
+
+  const [
+    notes,
+    setNotes,
+  ] = useState('');
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    message,
+    setMessage,
+  ] = useState({
     type: '',
     text: '',
   });
 
-  useEffect(() => {
-    let active = true;
+  // =====================================================
+  // LOAD
+  // =====================================================
 
-    const loadResultEntry = async () => {
+  const loadResultEntry =
+    async () => {
       if (!worklistId) {
         setMessage({
-          type: 'danger',
-          text: 'Thiếu mã worklist.',
+          type:
+            'danger',
+
+          text:
+            'Thiếu mã worklist.',
         });
 
-        setLoading(false);
+        setLoading(
+          false,
+        );
+
         return;
       }
 
       try {
-        setLoading(true);
+        setLoading(
+          true,
+        );
 
         const data =
-          await getResultEntry(worklistId);
+          await getResultEntry(
+            worklistId,
+          );
 
-        if (!active) {
-          return;
-        }
-
-        setWorkInfo(data);
+        setWorkInfo(
+          data,
+        );
 
         const list =
-          data?.indicators ??
-          data?.chiSo ??
-          data?.details ??
-          [];
+          Array.isArray(
+            data?.indicators,
+          )
+            ? data.indicators
+            : [];
 
         setIndicators(
-          list.map((item) => ({
-            indicatorId:
-              item.indicatorId ??
-              item.id ??
-              item.idChiSo ??
-              item.IDChiSo,
+          list.map(
+            (item) => ({
+              indicatorId:
+                item.indicatorId,
 
-            name:
-              item.name ??
-              item.tenChiSo ??
-              item.TenChiSo ??
-              'Chỉ số',
+              name:
+                item.name,
 
-            value:
-              item.value ??
-              item.giaTri ??
-              item.GiaTri ??
-              '',
+              unit:
+                item.unit ||
+                '',
 
-            unit:
-              item.unit ??
-              item.donVi ??
-              item.DonVi ??
-              '',
+              dataType:
+                item.dataType ||
+                'number',
 
-            reference:
-              item.reference ??
-              item.nguongThamChieu ??
-              item.NguongThamChieu ??
-              '',
+              value:
+                item.value ??
+                '',
 
-            abnormal: Boolean(
-              item.abnormal ??
-              item.batThuong ??
-              false
-            ),
-          }))
+              min:
+                item.min,
+
+              max:
+                item.max,
+
+              reference:
+                item.reference ||
+                '',
+
+              evaluation:
+                item.evaluation ||
+                'chua_danh_gia',
+
+              abnormal:
+                Boolean(
+                  item.abnormal,
+                ),
+
+              note:
+                item.note ||
+                '',
+            }),
+          ),
+        );
+
+        setGeneralResult(
+          data?.generalResult ||
+          '',
         );
 
         setNotes(
-          data?.notes ??
-          data?.ghiChu ??
-          data?.GhiChu ??
-          ''
+          data?.notes ||
+          '',
         );
       } catch (err) {
-        if (active) {
-          setMessage({
-            type: 'danger',
-            text: getApiErrorMessage(
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
               err,
-              'Không thể tải phiếu nhập kết quả.'
+              'Không thể tải phiếu nhập kết quả.',
             ),
-          });
-        }
+        });
       } finally {
-        if (active) {
-          setLoading(false);
-        }
+        setLoading(
+          false,
+        );
       }
     };
 
+  useEffect(() => {
     loadResultEntry();
-
-    return () => {
-      active = false;
-    };
   }, [worklistId]);
 
-  const updateIndicator = (
-    index,
-    field,
-    value
-  ) => {
-    setIndicators((prev) =>
-      prev.map((item, i) =>
-        i === index
-          ? {
-              ...item,
-              [field]: value,
-            }
-          : item
-      )
-    );
-  };
+  // =====================================================
+  // EDIT
+  // =====================================================
 
-  const buildPayload = () => ({
-    indicators: indicators.map((item) => ({
-      indicatorId: item.indicatorId,
-      value: item.value,
-      abnormal: item.abnormal,
-    })),
-    notes,
-  });
-
-  const validateBeforeSubmit = () => {
-    if (indicators.length === 0) {
-      setMessage({
-        type: 'warning',
-        text: 'Phiếu xét nghiệm chưa có chỉ số để nhập.',
-      });
-
-      return false;
-    }
-
-    const emptyIndex = indicators.findIndex(
-      (item) => !String(item.value ?? '').trim()
-    );
-
-    if (emptyIndex !== -1) {
-      setMessage({
-        type: 'warning',
-        text: `Vui lòng nhập kết quả cho chỉ số "${indicators[emptyIndex].name}".`,
-      });
-
-      return false;
-    }
-
-    return true;
-  };
-
-  const handleSaveDraft = async () => {
-    try {
-      setSaving(true);
-
-      await saveResultEntry(
-        worklistId,
-        buildPayload()
+  const updateIndicator =
+    (
+      index,
+      field,
+      value,
+    ) => {
+      setIndicators(
+        (prev) =>
+          prev.map(
+            (
+              item,
+              i,
+            ) =>
+              i === index
+                ? {
+                    ...item,
+                    [field]:
+                      value,
+                  }
+                : item,
+          ),
       );
+    };
 
-      setMessage({
-        type: 'success',
-        text: 'Đã lưu nháp kết quả.',
-      });
-    } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: getApiErrorMessage(
-          err,
-          'Không thể lưu nháp kết quả.'
+  const buildPayload =
+    () => ({
+      indicators:
+        indicators.map(
+          (item) => ({
+            indicatorId:
+              item.indicatorId,
+
+            value:
+              String(
+                item.value ??
+                '',
+              ).trim(),
+
+            abnormal:
+              Boolean(
+                item.abnormal,
+              ),
+
+            note:
+              item.note ||
+              null,
+          }),
         ),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
 
-  const handleSubmit = async () => {
-    if (!validateBeforeSubmit()) {
-      return;
-    }
+      generalResult:
+        generalResult.trim() ||
+        null,
 
-    const confirmed = window.confirm(
-      'Gửi kết quả sang bác sĩ duyệt? Sau khi gửi, kết quả có thể bị khóa chỉnh sửa tùy quy trình backend.'
-    );
+      notes:
+        notes.trim() ||
+        null,
+    });
 
-    if (!confirmed) {
-      return;
-    }
+  // =====================================================
+  // VALIDATE
+  // =====================================================
 
-    try {
-      setSaving(true);
+  const validateBeforeSubmit =
+    () => {
+      if (
+        indicators.length ===
+        0
+      ) {
+        setMessage({
+          type:
+            'warning',
 
-      await submitResultEntry(
-        worklistId,
-        buildPayload()
-      );
+          text:
+            'Xét nghiệm chưa được cấu hình chỉ số.',
+        });
 
-      setMessage({
-        type: 'success',
-        text: 'Đã gửi kết quả sang bác sĩ duyệt.',
-      });
-    } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: getApiErrorMessage(
-          err,
-          'Không thể gửi kết quả.'
-        ),
-      });
-    } finally {
-      setSaving(false);
-    }
-  };
+        return false;
+      }
+
+      const empty =
+        indicators.find(
+          (item) =>
+            !String(
+              item.value ??
+              '',
+            ).trim(),
+        );
+
+      if (empty) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            `Vui lòng nhập kết quả cho "${empty.name}".`,
+        });
+
+        return false;
+      }
+
+      return true;
+    };
+
+  // =====================================================
+  // SAVE DRAFT
+  // =====================================================
+
+  const handleSaveDraft =
+    async () => {
+      try {
+        setSaving(
+          true,
+        );
+
+        setMessage({
+          type: '',
+          text: '',
+        });
+
+        const result =
+          await saveResultEntry(
+            worklistId,
+            buildPayload(),
+          );
+
+        setMessage({
+          type:
+            'success',
+
+          text:
+            result?.message ||
+            'Đã lưu nháp.',
+        });
+
+        await loadResultEntry();
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể lưu nháp kết quả.',
+            ),
+        });
+      } finally {
+        setSaving(
+          false,
+        );
+      }
+    };
+
+  // =====================================================
+  // SUBMIT
+  // =====================================================
+
+  const handleSubmit =
+    async () => {
+      if (
+        !validateBeforeSubmit()
+      ) {
+        return;
+      }
+
+      if (
+        !window.confirm(
+          'Xác nhận gửi kết quả sang bác sĩ duyệt? Sau khi gửi bạn sẽ không thể chỉnh sửa.',
+        )
+      ) {
+        return;
+      }
+
+      try {
+        setSaving(
+          true,
+        );
+
+        setMessage({
+          type: '',
+          text: '',
+        });
+
+        const result =
+          await submitResultEntry(
+            worklistId,
+            buildPayload(),
+          );
+
+        setMessage({
+          type:
+            'success',
+
+          text:
+            result?.message ||
+            'Đã gửi kết quả sang bác sĩ duyệt.',
+        });
+
+        await loadResultEntry();
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể gửi duyệt kết quả.',
+            ),
+        });
+      } finally {
+        setSaving(
+          false,
+        );
+      }
+    };
 
   if (loading) {
     return (
-      <Loading text="Đang tải phiếu kết quả..." />
+      <Loading text="Đang tải phiếu nhập kết quả..." />
     );
   }
+
+  const editable =
+    workInfo?.editable !==
+    false;
 
   return (
     <div>
@@ -263,10 +473,7 @@ export default function NhapKetQua() {
           </h1>
 
           <p className="text-secondary mb-0">
-            {workInfo?.testName ??
-              workInfo?.tenXetNghiem ??
-              'Xét nghiệm'}{' '}
-            · Worklist #{worklistId}
+            Nhập kết quả theo từng chỉ số của xét nghiệm.
           </p>
         </div>
 
@@ -281,8 +488,12 @@ export default function NhapKetQua() {
 
       {message.text && (
         <Notification
-          type={message.type}
-          message={message.text}
+          type={
+            message.type
+          }
+          message={
+            message.text
+          }
           onClose={() =>
             setMessage({
               type: '',
@@ -292,194 +503,324 @@ export default function NhapKetQua() {
         />
       )}
 
-      <div className="card border-0 shadow-sm rounded-4 mb-4">
-        <div className="card-body p-4">
-          <div className="row g-3">
-            <div className="col-md-4">
-              <div className="small text-secondary">
-                Người bệnh
-              </div>
+      {!workInfo ? (
+        <div className="alert alert-warning">
+          Không tìm thấy worklist.
+        </div>
+      ) : (
+        <>
+          {/* INFO */}
 
-              <div className="fw-semibold">
-                {workInfo?.patientName ??
-                  workInfo?.tenKhachHang ??
-                  '—'}
-              </div>
-            </div>
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <div className="row g-3">
+                <Info
+                  label="Người bệnh"
+                  value={
+                    workInfo.patientName
+                  }
+                />
 
-            <div className="col-md-4">
-              <div className="small text-secondary">
-                Mã mẫu
-              </div>
+                <Info
+                  label="Xét nghiệm"
+                  value={
+                    workInfo.testName
+                  }
+                />
 
-              <div className="fw-semibold">
-                {workInfo?.specimenCode ??
-                  workInfo?.maMau ??
-                  '—'}
-              </div>
-            </div>
+                <Info
+                  label="Barcode"
+                  value={
+                    workInfo.specimenCode
+                  }
+                />
 
-            <div className="col-md-4">
-              <div className="small text-secondary">
-                Xét nghiệm
-              </div>
-
-              <div className="fw-semibold">
-                {workInfo?.testName ??
-                  workInfo?.tenXetNghiem ??
-                  '—'}
+                <Info
+                  label="Trạng thái"
+                  value={
+                    workInfo.resultStatus ||
+                    workInfo.worklistStatus
+                  }
+                />
               </div>
             </div>
           </div>
-        </div>
-      </div>
 
-      <div className="card border-0 shadow-sm rounded-4">
-        <div className="card-body p-4">
-          <h5 className="fw-bold mb-4">
-            Các chỉ số xét nghiệm
-          </h5>
+          {!editable && (
+            <div className="alert alert-info">
+              Kết quả đã được gửi duyệt hoặc đã được xử lý. Phiếu hiện ở chế độ chỉ đọc.
+            </div>
+          )}
 
-          <div className="table-responsive">
-            <table className="table align-middle">
-              <thead className="table-light">
-                <tr>
-                  <th>
-                    Chỉ số
-                  </th>
+          {/* INDICATORS */}
 
-                  <th style={{ minWidth: 170 }}>
-                    Kết quả
-                  </th>
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-4">
+                Chỉ số xét nghiệm
+              </h5>
 
-                  <th>
-                    Đơn vị
-                  </th>
+              <div className="table-responsive">
+                <table className="table align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>
+                        Chỉ số
+                      </th>
 
-                  <th>
-                    Khoảng tham chiếu
-                  </th>
+                      <th style={{
+                        minWidth:
+                          180,
+                      }}>
+                        Kết quả
+                      </th>
 
-                  <th style={{ minWidth: 150 }}>
-                    Đánh giá
-                  </th>
-                </tr>
-              </thead>
+                      <th>
+                        Đơn vị
+                      </th>
 
-              <tbody>
-                {indicators.length > 0 ? (
-                  indicators.map((item, index) => (
-                    <tr key={item.indicatorId ?? index}>
-                      <td className="fw-semibold">
-                        {item.name}
-                      </td>
+                      <th>
+                        Tham chiếu
+                      </th>
 
-                      <td>
-                        <input
-                          type="text"
-                          className="form-control"
-                          value={item.value}
-                          onChange={(e) =>
-                            updateIndicator(
-                              index,
-                              'value',
-                              e.target.value
-                            )
-                          }
-                        />
-                      </td>
+                      <th>
+                        Đánh giá
+                      </th>
 
-                      <td>
-                        {item.unit || '—'}
-                      </td>
+                      <th style={{
+                        minWidth:
+                          120,
+                      }}>
+                        Override
+                      </th>
+                    </tr>
+                  </thead>
 
-                      <td>
-                        {item.reference || '—'}
-                      </td>
-
-                      <td>
-                        <select
-                          className="form-select form-select-sm"
-                          value={
-                            item.abnormal
-                              ? 'ABNORMAL'
-                              : 'NORMAL'
-                          }
-                          onChange={(e) =>
-                            updateIndicator(
-                              index,
-                              'abnormal',
-                              e.target.value === 'ABNORMAL'
-                            )
+                  <tbody>
+                    {indicators.map(
+                      (
+                        item,
+                        index,
+                      ) => (
+                        <tr
+                          key={
+                            item.indicatorId
                           }
                         >
-                          <option value="NORMAL">
-                            Bình thường
-                          </option>
+                          <td className="fw-semibold">
+                            {
+                              item.name
+                            }
+                          </td>
 
-                          <option value="ABNORMAL">
-                            Bất thường
-                          </option>
-                        </select>
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td
-                      colSpan="5"
-                      className="text-center text-secondary py-4"
-                    >
-                      Chưa có chỉ số xét nghiệm được cấu hình.
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                          <td>
+                            <input
+                              type={
+                                item.dataType ===
+                                'number'
+                                  ? 'text'
+                                  : 'text'
+                              }
+                              inputMode={
+                                item.dataType ===
+                                'number'
+                                  ? 'decimal'
+                                  : undefined
+                              }
+                              className="form-control"
+                              value={
+                                item.value
+                              }
+                              disabled={
+                                !editable ||
+                                saving
+                              }
+                              onChange={(e) =>
+                                updateIndicator(
+                                  index,
+                                  'value',
+                                  e.target.value,
+                                )
+                              }
+                            />
+                          </td>
+
+                          <td>
+                            {item.unit ||
+                              '—'}
+                          </td>
+
+                          <td>
+                            {item.reference ||
+                              'Chưa cấu hình'}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`badge ${evaluationClass(
+                                item.evaluation,
+                              )}`}
+                            >
+                              {evaluationLabel(
+                                item.evaluation,
+                              )}
+                            </span>
+                          </td>
+
+                          <td>
+                            <div className="form-check">
+                              <input
+                                type="checkbox"
+                                className="form-check-input"
+                                checked={
+                                  item.abnormal
+                                }
+                                disabled={
+                                  !editable ||
+                                  saving
+                                }
+                                onChange={(e) =>
+                                  updateIndicator(
+                                    index,
+                                    'abnormal',
+                                    e.target.checked,
+                                  )
+                                }
+                              />
+
+                              <label className="form-check-label small">
+                                Bất thường
+                              </label>
+                            </div>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+
+                    {indicators.length ===
+                      0 && (
+                      <tr>
+                        <td
+                          colSpan="6"
+                          className="text-center text-secondary py-4"
+                        >
+                          Chưa cấu hình chỉ số cho xét nghiệm này.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
 
-          <div className="mt-4">
-            <label className="form-label fw-semibold">
-              Ghi chú kỹ thuật viên
-            </label>
+          {/* GENERAL */}
 
-            <textarea
-              className="form-control"
-              rows="4"
-              placeholder="Ghi chú về mẫu, máy xét nghiệm hoặc quá trình thực hiện..."
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-            />
+          <div className="card border-0 shadow-sm rounded-4">
+            <div className="card-body p-4">
+              <div className="mb-3">
+                <label className="form-label fw-semibold">
+                  Kết quả tổng quát
+                </label>
+
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  maxLength={500}
+                  value={
+                    generalResult
+                  }
+                  disabled={
+                    !editable ||
+                    saving
+                  }
+                  onChange={(e) =>
+                    setGeneralResult(
+                      e.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label fw-semibold">
+                  Ghi chú kỹ thuật viên
+                </label>
+
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  maxLength={500}
+                  value={
+                    notes
+                  }
+                  disabled={
+                    !editable ||
+                    saving
+                  }
+                  onChange={(e) =>
+                    setNotes(
+                      e.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              {editable && (
+                <div className="d-flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    className="btn btn-outline-primary"
+                    disabled={
+                      saving
+                    }
+                    onClick={
+                      handleSaveDraft
+                    }
+                  >
+                    <i className="fa-solid fa-floppy-disk me-2" />
+
+                    {saving
+                      ? 'Đang lưu...'
+                      : 'Lưu nháp'}
+                  </button>
+
+                  <button
+                    type="button"
+                    className="btn btn-success"
+                    disabled={
+                      saving
+                    }
+                    onClick={
+                      handleSubmit
+                    }
+                  >
+                    <i className="fa-solid fa-paper-plane me-2" />
+                    Gửi bác sĩ duyệt
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
+        </>
+      )}
+    </div>
+  );
+}
 
-          <div className="d-flex flex-wrap gap-2 mt-4">
-            {/* <button
-              type="button"
-              className="btn btn-outline-primary"
-              disabled={saving}
-              onClick={handleSaveDraft}
-            >
-              <i className="fa-regular fa-floppy-disk me-2" />
-              Lưu nháp
-            </button> */}
+function Info({
+  label,
+  value,
+}) {
+  return (
+    <div className="col-md-3">
+      <div className="small text-secondary">
+        {label}
+      </div>
 
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={
-                saving ||
-                indicators.length === 0
-              }
-              onClick={handleSubmit}
-            >
-              <i className="fa-solid fa-paper-plane me-2" />
-
-              {saving
-                ? 'Đang xử lý...'
-                : 'Gửi bác sĩ duyệt'}
-            </button>
-          </div>
-        </div>
+      <div className="fw-semibold">
+        {value ||
+          '—'}
       </div>
     </div>
   );

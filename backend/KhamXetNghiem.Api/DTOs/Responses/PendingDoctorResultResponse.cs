@@ -14,6 +14,7 @@ public sealed class PendingDoctorResultResponse
 
     public DateTime? SubmittedAt { get; init; }
 
-    public string Status { get; init; } =
-        "PENDING_APPROVAL";
+    public bool HasAbnormalIndicator { get; init; }
+
+    public string Status { get; init; } = "PENDING_APPROVAL";
 }

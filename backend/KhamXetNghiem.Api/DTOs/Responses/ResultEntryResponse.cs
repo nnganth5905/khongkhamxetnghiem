@@ -8,29 +8,25 @@ public sealed class ResultEntryResponse
 
     public string PatientName { get; init; } = string.Empty;
 
+    public string CustomerId { get; init; } = string.Empty;
+
+    public string SpecimenId { get; init; } = string.Empty;
+
     public string SpecimenCode { get; init; } = string.Empty;
+
+    public string TestId { get; init; } = string.Empty;
 
     public string TestName { get; init; } = string.Empty;
 
+    public string WorklistStatus { get; init; } = string.Empty;
+
+    public string? ResultStatus { get; init; }
+
+    public string? GeneralResult { get; init; }
+
     public string? Notes { get; init; }
 
-    public string Status { get; init; } = string.Empty;
+    public bool Editable { get; init; }
 
-    public List<ResultIndicatorResponse> Indicators { get; init; }
-        = new();
-}
-
-public sealed class ResultIndicatorResponse
-{
-    public string IndicatorId { get; init; } = string.Empty;
-
-    public string Name { get; init; } = string.Empty;
-
-    public string? Value { get; init; }
-
-    public string? Unit { get; init; }
-
-    public string? Reference { get; init; }
-
-    public bool Abnormal { get; init; }
+    public List<ResultIndicatorResponse> Indicators { get; init; } = [];
 }

@@ -1,13 +1,23 @@
 // src/services/appointmentService.js
+
 import api, { unwrap } from './api';
 
-// --- HÀM XỬ LÝ LỖI ---
+// =====================================================
+// ERROR
+// =====================================================
+
 export const getApiErrorMessage = (
   error,
-  defaultMessage = 'Có lỗi xảy ra khi xử lý thông tin lịch hẹn.'
+  defaultMessage =
+    'Có lỗi xảy ra khi xử lý thông tin lịch hẹn.'
 ) => {
-  if (!error) return defaultMessage;
-  if (typeof error === 'string') return error;
+  if (!error) {
+    return defaultMessage;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
 
   return (
     error.response?.data?.message ||
@@ -17,153 +27,427 @@ export const getApiErrorMessage = (
   );
 };
 
-// --- TÙY CHỌN & GIỜ ĐÃ ĐẶT ---
-export const getAppointmentOptions = async (params = {}) => {
-  const response = await api.get('/appointments/options', { params });
-  return unwrap(response);
-};
-export const getExaminationOptions = getAppointmentOptions;
-export const getTestingOptions = getAppointmentOptions;
+// =====================================================
+// OPTIONS
+// =====================================================
 
-export const getTakenTimes = async (type, doctorId, date) => {
-  const response = await api.get('/appointments/taken-times', {
-    params: { type, doctorId, date },
-  });
-  return unwrap(response);
-};
+export const getAppointmentOptions =
+  async (params = {}) => {
+    const response =
+      await api.get(
+        '/appointments/options',
+        {
+          params,
+        }
+      );
 
-// --- TẠO ĐẶT LỊCH ---
-export const createAppointment = async (payload) => {
-  const response = await api.post('/appointments', payload);
-  return unwrap(response);
-};
+    return unwrap(response);
+  };
 
-export const createQuickAppointment = async (payload) => {
-  const response = await api.post('/appointments/quick', payload);
-  return unwrap(response);
-};
+export const getExaminationOptions =
+  getAppointmentOptions;
 
-// ĐÃ SỬA ĐƯỜNG DẪN Ở ĐÂY
-export const createExaminationAppointment = async (payload) => {
-  const response = await api.post('/appointments/examinations', payload);
-  return unwrap(response);
-};
+export const getTestingOptions =
+  getAppointmentOptions;
 
-// ĐÃ SỬA ĐƯỜNG DẪN Ở ĐÂY
-export const createTestAppointment = async (payload) => {
-  const response = await api.post('/appointments/tests', payload);
-  return unwrap(response);
-};
-export const createTestingAppointment = createTestAppointment;
+// =====================================================
+// OLD TAKEN-TIMES COMPATIBILITY
+// =====================================================
 
-// Tiếp nhận vãng lai tại quầy (QuanLyTiepNhan.jsx)
-export const createWalkInVisit = async (payload) => {
-  const response = await api.post('/appointments/walk-in', payload);
-  return unwrap(response);
-};
+export const getTakenTimes =
+  async (
+    type,
+    doctorId,
+    date
+  ) => {
+    const response =
+      await api.get(
+        '/appointments/taken-times',
+        {
+          params: {
+            type,
+            doctorId,
+            date,
+          },
+        }
+      );
 
-// --- DÀNH CHO KHÁCH HÀNG (MY APPOINTMENTS) ---
-export const getMyAppointments = async (params = {}) => {
-  const response = await api.get('/appointments/my', { params });
-  return unwrap(response);
-};
+    return unwrap(response);
+  };
 
-export const getMyAppointmentDetail = async (id) => {
-  const response = await api.get(`/appointments/my/${id}`);
-  return unwrap(response);
-};
+// =====================================================
+// AVAILABLE SLOTS FROM WORK SCHEDULE
+// =====================================================
 
-// --- QUẢN LÝ LỊCH HẸN CHUNG ---
-export const getAppointments = async (params = {}) => {
-  const response = await api.get('/appointments', { params });
-  return unwrap(response);
-};
+export const getAvailableTimeSlots =
+  async ({
+    type,
+    doctorId,
+    date,
+    excludeId = null,
+  } = {}) => {
+    if (
+      !type ||
+      !doctorId ||
+      !date
+    ) {
+      return {
+        doctorId,
+        date,
+        slots: [],
+        takenTimes: [],
+      };
+    }
 
-export const getAppointmentById = async (id) => {
-  const response = await api.get(`/appointments/${id}`);
-  return unwrap(response);
-};
+    const response =
+      await api.get(
+        '/appointments/time-slots',
+        {
+          params: {
+            type,
+            doctorId,
+            date,
+            excludeId:
+              excludeId || undefined,
+          },
+        }
+      );
 
-export const getAppointment = getAppointmentById;
+    return unwrap(response);
+  };
 
-export const updateAppointment = async (id, payload) => {
-  const response = await api.put(`/appointments/${id}`, payload);
-  return unwrap(response);
-};
+// =====================================================
+// CREATE
+// =====================================================
 
-export const cancelAppointment = async (id, reason = '') => {
-  const response = await api.post(`/appointments/${id}/cancel`, { reason });
-  return unwrap(response);
-};
+export const createExaminationAppointment =
+  async (payload) => {
+    const response =
+      await api.post(
+        '/appointments/examinations',
+        payload
+      );
 
-// --- TIẾP NHẬN & CHECK-IN (LỄ TÂN) ---
-export const getReceptionAppointments = async (params = {}) => {
-  const response = await api.get('/appointments/reception', { params });
-  return unwrap(response);
-};
+    return unwrap(response);
+  };
 
-export const checkInAppointment = async (id, data = {}) => {
-  const response = await api.post(`/appointments/${id}/check-in`, data);
-  return unwrap(response);
-};
+export const createTestAppointment =
+  async (payload) => {
+    const response =
+      await api.post(
+        '/appointments/tests',
+        payload
+      );
 
-export const checkInByQr = async (qrCode, data = {}) => {
-  const response = await api.post('/appointments/check-in-qr', { qrCode, ...data });
-  return unwrap(response);
-};
+    return unwrap(response);
+  };
 
-// --- HÀNG ĐỢI & DANH SÁCH CHỜ ---
-export const getWaitingQueue = async (params = {}) => {
-  const response = await api.get('/appointments/waiting-queue', { params });
-  return unwrap(response);
-};
+export const createTestingAppointment =
+  createTestAppointment;
 
-export const getWaitingList = async (params = {}) => {
-  const response = await api.get('/appointments/waiting-list', { params });
-  return unwrap(response);
-};
+export const createQuickAppointment =
+  async (payload) => {
+    const response =
+      await api.post(
+        '/appointments/quick',
+        payload
+      );
 
-export const callPatient = async (id, data = {}) => {
-  const response = await api.post(`/appointments/queue/${id}/call`, data);
-  return unwrap(response);
-};
+    return unwrap(response);
+  };
 
-// Hàm "Gọi lại sau" cần được export để DanhSachCho.jsx sử dụng
-export const holdPatient = async (id) => {
-  const response = await api.post(`/appointments/queue/${id}/hold`);
-  return unwrap(response);
-};
+// Compatibility.
+export const createAppointment =
+  async (payload = {}) => {
+    const type =
+      String(
+        payload.type ||
+        payload.appointmentType ||
+        ''
+      ).toUpperCase();
 
-export const skipPatient = async (id, reason = '') => {
-  const response = await api.post(`/appointments/queue/${id}/skip`, { reason });
-  return unwrap(response);
-};
+    if (
+      type === 'TEST'
+      ||
+      payload.idxetnghiem
+    ) {
+      return createTestAppointment(
+        payload
+      );
+    }
 
-// --- BỔ TRỢ DỮ LIỆU ---
-export const getAvailableTimeSlots = async (params = {}) => {
-  const response = await api.get('/appointments/time-slots', { params });
-  return unwrap(response);
-};
+    return createExaminationAppointment(
+      payload
+    );
+  };
 
-export const getAvailableDoctors = async (params = {}) => {
-  const response = await api.get('/doctors', { params });
-  return unwrap(response);
-};
+// =====================================================
+// MY APPOINTMENTS
+// =====================================================
 
-export const getSpecialties = async (params = {}) => {
-  const response = await api.get('/specialties', { params });
-  return unwrap(response);
-};
+export const getMyAppointments =
+  async () => {
+    const response =
+      await api.get(
+        '/appointments/my'
+      );
 
-export const getAppointmentDetail = async (id) => {
-  try {
-    const response = await api.get(`/appointments/${id}`);
-    return response.data;
-  } catch (error) {
-    throw error;
-  }
-};
+    return unwrap(response);
+  };
 
-// --- ALIASES ---
-export const checkIn = checkInAppointment;
-export const bookAppointment = createAppointment;
+// Detail route đã có sẵn.
+// Không gọi /appointments/my/{id} vì backend không có route đó.
+export const getMyAppointmentDetail =
+  async (id) => {
+    return getAppointmentById(id);
+  };
+
+// =====================================================
+// STAFF LIST
+// =====================================================
+
+export const getAppointments =
+  async (params = {}) => {
+    const response =
+      await api.get(
+        '/appointments',
+        {
+          params,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+// =====================================================
+// DETAIL
+// =====================================================
+
+export const getAppointmentById =
+  async (id) => {
+    const response =
+      await api.get(
+        `/appointments/${encodeURIComponent(
+          id
+        )}`
+      );
+
+    return unwrap(response);
+  };
+
+export const getAppointment =
+  getAppointmentById;
+
+export const getAppointmentDetail =
+  getAppointmentById;
+
+// =====================================================
+// UPDATE
+// =====================================================
+
+export const updateAppointment =
+  async (
+    id,
+    payload
+  ) => {
+    const response =
+      await api.put(
+        `/appointments/${encodeURIComponent(
+          id
+        )}`,
+        payload
+      );
+
+    return unwrap(response);
+  };
+
+// =====================================================
+// CANCEL
+// =====================================================
+
+export const cancelAppointment =
+  async (
+    id
+  ) => {
+    const response =
+      await api.post(
+        `/appointments/${encodeURIComponent(
+          id
+        )}/cancel`
+      );
+
+    return unwrap(response);
+  };
+
+// =====================================================
+// MODULE 9 - RECEPTION / CHECK-IN
+//
+// Giữ export vì các trang hiện tại đang import.
+// Backend tương ứng sẽ được hoàn thiện ở Module 9.
+// =====================================================
+
+export const createWalkInVisit =
+  async (payload) => {
+    const response =
+      await api.post(
+        '/appointments/walk-in',
+        payload
+      );
+
+    return unwrap(response);
+  };
+
+export const getReceptionAppointments =
+  async (params = {}) => {
+    const response =
+      await api.get(
+        '/appointments/reception',
+        {
+          params,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+export const checkInAppointment =
+  async (
+    id,
+    data = {}
+  ) => {
+    const response =
+      await api.post(
+        `/appointments/${encodeURIComponent(
+          id
+        )}/check-in`,
+        data
+      );
+
+    return unwrap(response);
+  };
+
+export const checkInByQr =
+  async (
+    qrCode,
+    data = {}
+  ) => {
+    const response =
+      await api.post(
+        '/appointments/check-in-qr',
+        {
+          qrCode,
+          ...data,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+export const getWaitingQueue =
+  async (params = {}) => {
+    const normalized =
+      typeof params === 'string'
+        ? {
+            type: params,
+          }
+        : params;
+
+    const response =
+      await api.get(
+        '/appointments/waiting-queue',
+        {
+          params: normalized,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+export const getWaitingList =
+  getWaitingQueue;
+
+export const callPatient =
+  async (
+    id,
+    data = {}
+  ) => {
+    const response =
+      await api.post(
+        `/appointments/queue/${encodeURIComponent(
+          id
+        )}/call`,
+        data
+      );
+
+    return unwrap(response);
+  };
+
+export const holdPatient =
+  async (id) => {
+    const response =
+      await api.post(
+        `/appointments/queue/${encodeURIComponent(
+          id
+        )}/hold`
+      );
+
+    return unwrap(response);
+  };
+
+export const skipPatient =
+  async (
+    id,
+    reason = ''
+  ) => {
+    const response =
+      await api.post(
+        `/appointments/queue/${encodeURIComponent(
+          id
+        )}/skip`,
+        {
+          reason,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+// =====================================================
+// OTHER DATA
+// =====================================================
+
+export const getAvailableDoctors =
+  async (params = {}) => {
+    const response =
+      await api.get(
+        '/doctors',
+        {
+          params,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+export const getSpecialties =
+  async (params = {}) => {
+    const response =
+      await api.get(
+        '/specialties',
+        {
+          params,
+        }
+      );
+
+    return unwrap(response);
+  };
+
+// =====================================================
+// ALIASES
+// =====================================================
+
+export const checkIn =
+  checkInAppointment;
+
+export const bookAppointment =
+  createAppointment;

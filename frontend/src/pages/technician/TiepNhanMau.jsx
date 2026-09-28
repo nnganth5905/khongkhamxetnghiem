@@ -1,4 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
+
 import {
   Link,
   useNavigate,
@@ -14,164 +18,283 @@ import {
   rejectSpecimen,
 } from '../../services/technicianService';
 
-import { getApiErrorMessage } from '../../services/api';
+import {
+  getApiErrorMessage,
+} from '../../services/api';
+
+const formatDateTime =
+  (value) => {
+    if (!value) {
+      return '—';
+    }
+
+    const date =
+      new Date(value);
+
+    return Number.isNaN(
+      date.getTime(),
+    )
+      ? value
+      : date.toLocaleString(
+          'vi-VN',
+        );
+  };
 
 export default function TiepNhanMau() {
-  const { specimenId } = useParams();
-  const navigate = useNavigate();
+  const {
+    specimenId,
+  } = useParams();
 
-  const [specimen, setSpecimen] = useState(null);
+  const navigate =
+    useNavigate();
 
-  const [form, setForm] = useState({
-    condition: 'GOOD',
-    notes: '',
+  const [
+    specimen,
+    setSpecimen,
+  ] = useState(null);
+
+  const [
+    form,
+    setForm,
+  ] = useState({
+    condition:
+      'GOOD',
+
+    notes:
+      '',
   });
 
-  const [loading, setLoading] = useState(true);
-  const [processing, setProcessing] = useState(false);
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
 
-  const [message, setMessage] = useState({
+  const [
+    processing,
+    setProcessing,
+  ] = useState(false);
+
+  const [
+    message,
+    setMessage,
+  ] = useState({
     type: '',
     text: '',
   });
 
+  // =====================================================
+  // LOAD
+  // =====================================================
+
   useEffect(() => {
     let active = true;
 
-    const loadSpecimen = async () => {
-      if (!specimenId) {
-        setMessage({
-          type: 'danger',
-          text: 'Thiếu mã mẫu bệnh phẩm.',
-        });
-
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-
-        const data = await getSpecimen(specimenId);
-
-        if (active) {
-          setSpecimen(data);
-        }
-      } catch (err) {
-        if (active) {
+    const load =
+      async () => {
+        if (!specimenId) {
           setMessage({
-            type: 'danger',
-            text: getApiErrorMessage(
-              err,
-              'Không thể tải thông tin mẫu bệnh phẩm.'
-            ),
-          });
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
+            type:
+              'danger',
 
-    loadSpecimen();
+            text:
+              'Thiếu mã mẫu bệnh phẩm.',
+          });
+
+          setLoading(
+            false,
+          );
+
+          return;
+        }
+
+        try {
+          setLoading(
+            true,
+          );
+
+          const data =
+            await getSpecimen(
+              specimenId,
+            );
+
+          if (active) {
+            setSpecimen(
+              data,
+            );
+          }
+        } catch (err) {
+          if (active) {
+            setMessage({
+              type:
+                'danger',
+
+              text:
+                getApiErrorMessage(
+                  err,
+                  'Không thể tải thông tin mẫu.',
+                ),
+            });
+          }
+        } finally {
+          if (active) {
+            setLoading(
+              false,
+            );
+          }
+        }
+      };
+
+    load();
 
     return () => {
       active = false;
     };
   }, [specimenId]);
 
-  const setField = (name, value) => {
-    setForm((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  // =====================================================
+  // RECEIVE
+  // =====================================================
 
-  const handleReceive = async () => {
-    try {
-      setProcessing(true);
+  const handleReceive =
+    async () => {
+      try {
+        setProcessing(
+          true,
+        );
 
-      await receiveSpecimen(
-        specimenId,
-        form
-      );
+        const result =
+          await receiveSpecimen(
+            specimenId,
+            {
+              condition:
+                form.condition,
 
-      setMessage({
-        type: 'success',
-        text: 'Tiếp nhận mẫu thành công.',
-      });
+              notes:
+                form.notes.trim() ||
+                null,
+            },
+          );
 
-      setTimeout(() => {
-        navigate('/technician/worklist');
-      }, 700);
-    } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: getApiErrorMessage(
-          err,
-          'Không thể tiếp nhận mẫu.'
-        ),
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
+        setMessage({
+          type:
+            'success',
 
-  const handleReject = async () => {
-    const reason = window.prompt(
-      'Nhập lý do từ chối mẫu bệnh phẩm:'
-    );
+          text:
+            result?.message ||
+            'Tiếp nhận mẫu thành công.',
+        });
 
-    if (reason === null) {
-      return;
-    }
+        setTimeout(
+          () => {
+            navigate(
+              '/technician/worklist',
+            );
+          },
+          900,
+        );
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
 
-    if (!reason.trim()) {
-      setMessage({
-        type: 'warning',
-        text: 'Vui lòng nhập lý do từ chối mẫu.',
-      });
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể tiếp nhận mẫu.',
+            ),
+        });
+      } finally {
+        setProcessing(
+          false,
+        );
+      }
+    };
 
-      return;
-    }
+  // =====================================================
+  // REJECT
+  // =====================================================
 
-    try {
-      setProcessing(true);
+  const handleReject =
+    async () => {
+      const reason =
+        window.prompt(
+          'Nhập lý do từ chối mẫu bệnh phẩm:',
+        );
 
-      await rejectSpecimen(
-        specimenId,
-        {
-          reason: reason.trim(),
-        }
-      );
+      if (reason === null) {
+        return;
+      }
 
-      setMessage({
-        type: 'warning',
-        text: 'Đã từ chối mẫu bệnh phẩm.',
-      });
+      if (!reason.trim()) {
+        setMessage({
+          type:
+            'warning',
 
-      setTimeout(() => {
-        navigate('/technician/mau-benh-pham');
-      }, 700);
-    } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: getApiErrorMessage(
-          err,
-          'Không thể từ chối mẫu.'
-        ),
-      });
-    } finally {
-      setProcessing(false);
-    }
-  };
+          text:
+            'Lý do từ chối không được để trống.',
+        });
+
+        return;
+      }
+
+      try {
+        setProcessing(
+          true,
+        );
+
+        const result =
+          await rejectSpecimen(
+            specimenId,
+            {
+              reason:
+                reason.trim(),
+            },
+          );
+
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            result?.message ||
+            'Đã từ chối mẫu.',
+        });
+
+        setTimeout(
+          () => {
+            navigate(
+              '/technician/mau-benh-pham',
+            );
+          },
+          900,
+        );
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể từ chối mẫu.',
+            ),
+        });
+      } finally {
+        setProcessing(
+          false,
+        );
+      }
+    };
 
   if (loading) {
     return (
       <Loading text="Đang tải thông tin mẫu..." />
     );
   }
+
+  const canProcess =
+    specimen?.status ===
+    'HANDED_OVER';
 
   return (
     <div>
@@ -182,7 +305,7 @@ export default function TiepNhanMau() {
           </h1>
 
           <p className="text-secondary mb-0">
-            Kiểm tra tình trạng mẫu trước khi đưa vào worklist.
+            Kiểm tra mẫu trước khi đưa vào worklist.
           </p>
         </div>
 
@@ -197,8 +320,12 @@ export default function TiepNhanMau() {
 
       {message.text && (
         <Notification
-          type={message.type}
-          message={message.text}
+          type={
+            message.type
+          }
+          message={
+            message.text
+          }
           onClose={() =>
             setMessage({
               type: '',
@@ -208,179 +335,235 @@ export default function TiepNhanMau() {
         />
       )}
 
-      <div className="row g-4">
-        <div className="col-lg-5">
-          <div className="card border-0 shadow-sm rounded-4 h-100">
-            <div className="card-body p-4">
-              <h5 className="fw-bold mb-4">
-                Thông tin mẫu
-              </h5>
-
-              <div className="mb-3">
-                <div className="small text-secondary">
-                  Mã mẫu
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.code ??
-                    specimen?.maMau ??
-                    specimen?.MaMau ??
-                    specimenId}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="small text-secondary">
-                  Mã vạch
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.barcode ??
-                    specimen?.maVach ??
-                    specimen?.MaVach ??
-                    '—'}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="small text-secondary">
-                  Người bệnh
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.patientName ??
-                    specimen?.tenKhachHang ??
-                    specimen?.TenKhachHang ??
-                    '—'}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="small text-secondary">
-                  Loại mẫu
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.specimenType ??
-                    specimen?.loaiMau ??
-                    specimen?.LoaiMau ??
-                    '—'}
-                </div>
-              </div>
-
-              <div className="mb-3">
-                <div className="small text-secondary">
-                  Thời gian lấy mẫu
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.collectedAt ??
-                    specimen?.thoiGianLay ??
-                    specimen?.ThoiGianLay ??
-                    '—'}
-                </div>
-              </div>
-
-              <div>
-                <div className="small text-secondary">
-                  Người bàn giao
-                </div>
-
-                <div className="fw-semibold">
-                  {specimen?.handoverBy ??
-                    specimen?.nguoiBanGiao ??
-                    '—'}
-                </div>
-              </div>
-            </div>
-          </div>
+      {!specimen ? (
+        <div className="alert alert-danger">
+          Không tìm thấy mẫu bệnh phẩm.
         </div>
+      ) : (
+        <div className="row g-4">
+          <div className="col-lg-5">
+            <div className="card border-0 shadow-sm rounded-4 h-100">
+              <div className="card-body p-4">
+                <h5 className="fw-bold mb-4">
+                  Thông tin mẫu
+                </h5>
 
-        <div className="col-lg-7">
-          <div className="card border-0 shadow-sm rounded-4">
-            <div className="card-body p-4">
-              <h5 className="fw-bold mb-4">
-                Đánh giá mẫu
-              </h5>
-
-              <div className="mb-3">
-                <label className="form-label fw-semibold">
-                  Tình trạng mẫu
-                </label>
-
-                <select
-                  className="form-select"
-                  value={form.condition}
-                  onChange={(e) =>
-                    setField(
-                      'condition',
-                      e.target.value
-                    )
+                <Info
+                  label="Mã mẫu"
+                  value={
+                    specimen.id
                   }
-                >
-                  <option value="GOOD">
-                    Đạt yêu cầu
-                  </option>
+                />
 
-                  <option value="WARNING">
-                    Có lưu ý nhưng vẫn có thể xử lý
-                  </option>
-                </select>
-              </div>
+                <Info
+                  label="Barcode"
+                  value={
+                    specimen.barcode
+                  }
+                />
 
-              <div className="mb-4">
-                <label className="form-label fw-semibold">
-                  Ghi chú kỹ thuật viên
-                </label>
+                <Info
+                  label="Người bệnh"
+                  value={
+                    specimen.patientName
+                  }
+                />
 
-                <textarea
-                  className="form-control"
-                  rows="5"
-                  placeholder="Ví dụ: lượng mẫu đủ, không tan huyết, bao bì nguyên vẹn..."
-                  value={form.notes}
-                  onChange={(e) =>
-                    setField(
-                      'notes',
-                      e.target.value
-                    )
+                <Info
+                  label="Xét nghiệm"
+                  value={
+                    specimen.testName
+                  }
+                />
+
+                <Info
+                  label="Loại mẫu"
+                  value={
+                    specimen.specimenType
+                  }
+                />
+
+                <Info
+                  label="Thời gian lấy"
+                  value={formatDateTime(
+                    specimen.collectedAt,
+                  )}
+                />
+
+                <Info
+                  label="Bác sĩ lấy mẫu"
+                  value={
+                    specimen.collectorName
+                  }
+                />
+
+                <Info
+                  label="Người bàn giao"
+                  value={
+                    specimen.handoverBy
+                  }
+                />
+
+                <Info
+                  label="Thời gian bàn giao"
+                  value={formatDateTime(
+                    specimen.handedOverAt,
+                  )}
+                />
+
+                <Info
+                  label="Trạng thái"
+                  value={
+                    specimen.status
                   }
                 />
               </div>
+            </div>
+          </div>
 
-              <div className="alert alert-light border">
-                <i className="fa-solid fa-circle-info me-2 text-primary" />
-                Chỉ tiếp nhận khi mẫu đáp ứng điều kiện xét nghiệm.
-                Nếu mẫu không đạt, chọn <strong>Từ chối mẫu</strong> và
-                nhập lý do để hệ thống lưu truy vết.
-              </div>
+          <div className="col-lg-7">
+            <div className="card border-0 shadow-sm rounded-4">
+              <div className="card-body p-4">
+                <h5 className="fw-bold mb-4">
+                  Đánh giá mẫu
+                </h5>
 
-              <div className="d-flex flex-wrap gap-2 mt-4">
-                <button
-                  type="button"
-                  className="btn btn-success"
-                  disabled={processing}
-                  onClick={handleReceive}
-                >
-                  <i className="fa-solid fa-check me-2" />
+                {!canProcess && (
+                  <div className="alert alert-info">
+                    Mẫu hiện ở trạng thái{' '}
+                    <strong>
+                      {
+                        specimen.status
+                      }
+                    </strong>
+                    , không còn chờ tiếp nhận.
+                  </div>
+                )}
 
-                  {processing
-                    ? 'Đang xử lý...'
-                    : 'Xác nhận tiếp nhận'}
-                </button>
+                <div className="mb-3">
+                  <label className="form-label fw-semibold">
+                    Tình trạng mẫu
+                  </label>
 
-                <button
-                  type="button"
-                  className="btn btn-outline-danger"
-                  disabled={processing}
-                  onClick={handleReject}
-                >
-                  <i className="fa-solid fa-xmark me-2" />
-                  Từ chối mẫu
-                </button>
+                  <select
+                    className="form-select"
+                    value={
+                      form.condition
+                    }
+                    disabled={
+                      !canProcess ||
+                      processing
+                    }
+                    onChange={(e) =>
+                      setForm(
+                        (prev) => ({
+                          ...prev,
+
+                          condition:
+                            e.target.value,
+                        }),
+                      )
+                    }
+                  >
+                    <option value="GOOD">
+                      Đạt yêu cầu
+                    </option>
+
+                    <option value="WARNING">
+                      Có lưu ý nhưng vẫn có thể xử lý
+                    </option>
+                  </select>
+                </div>
+
+                <div className="mb-4">
+                  <label className="form-label fw-semibold">
+                    Ghi chú kỹ thuật viên
+                  </label>
+
+                  <textarea
+                    className="form-control"
+                    rows="5"
+                    maxLength={255}
+                    disabled={
+                      !canProcess ||
+                      processing
+                    }
+                    value={
+                      form.notes
+                    }
+                    onChange={(e) =>
+                      setForm(
+                        (prev) => ({
+                          ...prev,
+
+                          notes:
+                            e.target.value,
+                        }),
+                      )
+                    }
+                  />
+                </div>
+
+                <div className="alert alert-light border">
+                  Nếu mẫu không đạt chất lượng, hãy từ chối mẫu. Hệ thống sẽ tự chuyển chỉ định trở lại trạng thái <strong>chờ lấy mẫu</strong>.
+                </div>
+
+                {canProcess && (
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className="btn btn-success"
+                      disabled={
+                        processing
+                      }
+                      onClick={
+                        handleReceive
+                      }
+                    >
+                      <i className="fa-solid fa-check me-2" />
+
+                      {processing
+                        ? 'Đang xử lý...'
+                        : 'Xác nhận tiếp nhận'}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger"
+                      disabled={
+                        processing
+                      }
+                      onClick={
+                        handleReject
+                      }
+                    >
+                      <i className="fa-solid fa-xmark me-2" />
+                      Từ chối mẫu
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
         </div>
+      )}
+    </div>
+  );
+}
+
+function Info({
+  label,
+  value,
+}) {
+  return (
+    <div className="mb-3">
+      <div className="small text-secondary">
+        {label}
+      </div>
+
+      <div className="fw-semibold">
+        {value ||
+          '—'}
       </div>
     </div>
   );

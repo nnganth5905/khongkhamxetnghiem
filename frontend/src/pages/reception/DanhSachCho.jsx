@@ -1,274 +1,928 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
 
-import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
 
-// IMPORT service mới
+import {
+  getAppointmentOptions,
+} from '../../services/appointmentService';
+
 import visitService from '../../services/visitService';
-import { getApiErrorMessage } from '../../services/api';
 
-// Map lại với trường dữ liệu backend trả về
-const normalizeQueueItem = (item = {}) => ({
-  id: item.maLuot || item.id || Math.random().toString(), // Dùng mã lượt làm ID tạm
-  code: item.maLuot || '—',
-  queueNumber: item.stt || '—',
-  patientName: item.tenNguoiBenh || '—',
-  service: item.dichVu || '—',
-  room: item.phong || '—',
-  checkInTime: item.checkInTime || '—',
-  status: item.trangThai || 'WAITING',
-});
+import {
+  getApiErrorMessage,
+} from '../../services/api';
 
-const statusText = (status) => {
-  switch (String(status || '').toLowerCase()) {
-    case 'da_tiep_nhan':
-      return 'Đã tiếp nhận';
-    case 'cho_kham':
-      return 'Chờ khám';
-    case 'cho_xet_nghiem':
-      return 'Chờ xét nghiệm';
-    case 'waiting':
-      return 'Đang chờ';
-    case 'called':
-      return 'Đã gọi';
-    case 'examining':
-    case 'dang_kham':
-      return 'Đang khám';
-    case 'testing':
-    case 'dang_lay_mau':
-      return 'Đang lấy mẫu';
-    case 'completed':
-    case 'hoan_tat':
-      return 'Hoàn tất';
-    default:
-      return status || 'Chưa xác định';
-  }
+// =====================================================
+// EMPTY
+// =====================================================
+
+const EMPTY_FORM = {
+  fullName: '',
+  phone: '',
+  email: '',
+  dateOfBirth: '',
+  gender: '',
+  address: '',
+
+  serviceType:
+    'EXAMINATION',
+
+  specialtyId:
+    '',
+
+  testId:
+    '',
+
+  reason:
+    '',
+
+  notes:
+    '',
 };
 
-const statusClass = (status) => {
-  switch (String(status || '').toLowerCase()) {
-    case 'da_tiep_nhan':
-      return 'bg-primary-subtle text-primary';
-    case 'cho_kham':
-    case 'cho_xet_nghiem':
-    case 'called':
-      return 'bg-warning-subtle text-warning-emphasis';
-    case 'examining':
-    case 'testing':
-    case 'dang_kham':
-    case 'dang_lay_mau':
-      return 'bg-info-subtle text-info-emphasis';
-    case 'completed':
-    case 'hoan_tat':
-      return 'bg-success-subtle text-success';
-    default:
-      return 'bg-secondary-subtle text-secondary';
-  }
-};
+// =====================================================
+// HELPERS
+// =====================================================
 
-export default function DanhSachCho() {
-  const [queue, setQueue] = useState([]);
-  const [keyword, setKeyword] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const getLocalToday =
+  () => {
+    const now =
+      new Date();
 
-  const loadQueue = async (showLoading = true) => {
-    try {
-      if (showLoading) {
-        setLoading(true);
-      }
+    return [
+      now.getFullYear(),
 
-      // SỬ DỤNG visitService GỌI API MỚI
-      const data = await visitService.getReceptionWaitingList('ALL');
+      String(
+        now.getMonth() + 1
+      ).padStart(
+        2,
+        '0'
+      ),
 
-      const list = Array.isArray(data)
-        ? data
-        : data?.content || data?.items || data?.data || [];
-
-      setQueue(list.map(normalizeQueueItem));
-    } catch (err) {
-      setError(
-        getApiErrorMessage(
-          err,
-          'Không thể tải danh sách chờ.'
-        )
-      );
-    } finally {
-      if (showLoading) {
-        setLoading(false);
-      }
-    }
+      String(
+        now.getDate()
+      ).padStart(
+        2,
+        '0'
+      ),
+    ].join('-');
   };
 
-  useEffect(() => {
-    loadQueue();
+const getTestId =
+  (item) =>
+    item?.id ??
+    item?.IDXetNghiem;
 
-    const timer = setInterval(() => {
-      loadQueue(false);
-    }, 30000);
+const getTestName =
+  (item) =>
+    item?.name ??
+    item?.TenXetNghiem ??
+    'Xét nghiệm';
+
+const getTestSpecialty =
+  (item) =>
+    item?.specialtyId ??
+    item?.ChuyenKhoaID;
+
+const getTestPrice =
+  (item) =>
+    Number(
+      item?.price ??
+      item?.Gia ??
+      0
+    ) || 0;
+
+// =====================================================
+// COMPONENT
+// =====================================================
+
+export default function QuanLyTiepNhan() {
+  const [
+    form,
+    setForm,
+  ] = useState(
+    EMPTY_FORM
+  );
+
+  const [
+    specialties,
+    setSpecialties,
+  ] = useState({});
+
+  const [
+    tests,
+    setTests,
+  ] = useState([]);
+
+  const [
+    optionsLoading,
+    setOptionsLoading,
+  ] = useState(true);
+
+  const [
+    saving,
+    setSaving,
+  ] = useState(false);
+
+  const [
+    message,
+    setMessage,
+  ] = useState({
+    type: '',
+    text: '',
+  });
+
+  // =====================================================
+  // LOAD OPTIONS
+  // =====================================================
+
+  useEffect(() => {
+    let active = true;
+
+    const loadOptions =
+      async () => {
+        try {
+          setOptionsLoading(
+            true
+          );
+
+          const data =
+            await getAppointmentOptions();
+
+          if (!active) {
+            return;
+          }
+
+          setSpecialties(
+            data?.departments ||
+            {}
+          );
+
+          setTests(
+            data?.tests ||
+            []
+          );
+        } catch (err) {
+          if (!active) {
+            return;
+          }
+
+          setMessage({
+            type:
+              'danger',
+
+            text:
+              getApiErrorMessage(
+                err,
+                'Không thể tải danh mục chuyên khoa/xét nghiệm.'
+              ),
+          });
+        } finally {
+          if (active) {
+            setOptionsLoading(
+              false
+            );
+          }
+        }
+      };
+
+    loadOptions();
 
     return () => {
-      clearInterval(timer);
+      active = false;
     };
   }, []);
 
-  const filteredQueue = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
+  // =====================================================
+  // FILTER TESTS
+  // =====================================================
 
-    if (!q) {
-      return queue;
-    }
+  const filteredTests =
+    useMemo(
+      () => {
+        if (
+          !form.specialtyId
+        ) {
+          return tests;
+        }
 
-    return queue.filter((item) =>
+        return tests.filter(
+          (item) =>
+            String(
+              getTestSpecialty(
+                item
+              ) ||
+              ''
+            ) ===
+            String(
+              form.specialtyId
+            )
+        );
+      },
       [
-        item.code,
-        item.patientName,
-        item.service,
-        item.room,
+        tests,
+        form.specialtyId,
       ]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
     );
-  }, [queue, keyword]);
+
+  // =====================================================
+  // SET FIELD
+  // =====================================================
+
+  const setField =
+    (
+      name,
+      value
+    ) => {
+      setForm(
+        (prev) => ({
+          ...prev,
+          [name]:
+            value,
+        })
+      );
+    };
+
+  const handleServiceTypeChange =
+    (value) => {
+      setForm(
+        (prev) => ({
+          ...prev,
+
+          serviceType:
+            value,
+
+          testId:
+            '',
+
+          specialtyId:
+            '',
+        })
+      );
+    };
+
+  // =====================================================
+  // SUBMIT
+  // =====================================================
+
+  const handleSubmit =
+    async (e) => {
+      e.preventDefault();
+
+      if (
+        !form.fullName
+          .trim()
+      ) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            'Vui lòng nhập họ và tên khách hàng.',
+        });
+
+        return;
+      }
+
+      if (
+        !form.phone
+          .trim()
+      ) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            'Vui lòng nhập số điện thoại.',
+        });
+
+        return;
+      }
+
+      if (
+        form.serviceType ===
+          'EXAMINATION'
+        &&
+        !form.specialtyId
+      ) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            'Vui lòng chọn chuyên khoa khám.',
+        });
+
+        return;
+      }
+
+      if (
+        form.serviceType ===
+          'TEST'
+        &&
+        !form.testId
+      ) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            'Vui lòng chọn loại xét nghiệm.',
+        });
+
+        return;
+      }
+
+      try {
+        setSaving(
+          true
+        );
+
+        setMessage({
+          type: '',
+          text: '',
+        });
+
+        const data =
+          await visitService
+            .createWalkInVisit(
+              {
+                ...form,
+
+                fullName:
+                  form.fullName
+                    .trim(),
+
+                phone:
+                  form.phone
+                    .trim(),
+
+                email:
+                  form.email
+                    .trim(),
+
+                address:
+                  form.address
+                    .trim(),
+
+                reason:
+                  form.reason
+                    .trim(),
+
+                notes:
+                  form.notes
+                    .trim(),
+              }
+            );
+
+        const roomText =
+          data?.roomName
+            ? ` - Phòng: ${data.roomName}`
+            : '';
+
+        const orderText =
+          data?.testOrderId
+            ? ` - Phiếu XN: ${data.testOrderId}`
+            : '';
+
+        setMessage({
+          type:
+            'success',
+
+          text:
+            data?.message
+            ||
+            `Tiếp nhận thành công - STT: ${
+              data?.queueNumber ??
+              '—'
+            }${roomText}${orderText}`,
+        });
+
+        setForm(
+          EMPTY_FORM
+        );
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể tạo lượt tiếp nhận.'
+            ),
+        });
+      } finally {
+        setSaving(
+          false
+        );
+      }
+    };
+
+  const today =
+    getLocalToday();
 
   return (
     <div>
-      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
-        <div>
-          <h1 className="dashboard-page-title mb-1" style={{ color: 'var(--primary, #0d6efd)' }}>
-            Danh sách chờ
-          </h1>
+      <h1 className="dashboard-page-title">
+        Quản lý tiếp nhận
+      </h1>
 
-          <p className="text-secondary mb-0">
-            Hàng chờ hiện tại của khách khám bệnh và xét nghiệm.
-          </p>
-        </div>
+      <p className="text-secondary mb-4">
+        Tạo lượt khám/xét nghiệm cho khách đến trực tiếp chưa có lịch hẹn.
+      </p>
 
-        <button
-          type="button"
-          className="btn btn-outline-primary bg-white fw-medium"
-          onClick={() => loadQueue()}
-          disabled={loading}
-        >
-          <i className="fa-solid fa-rotate me-2" />
-          Làm mới
-        </button>
-      </div>
-
-      {error && (
+      {message.text && (
         <Notification
-          type="danger"
-          message={error}
-          onClose={() => setError('')}
+          type={
+            message.type
+          }
+          message={
+            message.text
+          }
+          onClose={() =>
+            setMessage({
+              type: '',
+              text: '',
+            })
+          }
         />
       )}
 
-      <div className="card border-0 shadow-sm rounded-4">
+      <form
+        onSubmit={
+          handleSubmit
+        }
+        className="card border-0 shadow-sm rounded-4"
+      >
         <div className="card-body p-4">
-          <div className="d-flex flex-wrap gap-3 justify-content-between align-items-center mb-4">
+          {/* PATIENT */}
+
+          <div className="d-flex align-items-center gap-3 mb-4">
             <div
-              className="input-group"
+              className="d-flex align-items-center justify-content-center rounded-circle"
               style={{
-                maxWidth: 520,
+                width:
+                  48,
+
+                height:
+                  48,
+
+                background:
+                  '#eaf2ff',
+
+                color:
+                  'var(--primary)',
               }}
             >
-              <span className="input-group-text bg-white border-end-0">
-                <i className="fa-solid fa-magnifying-glass text-secondary" />
-              </span>
+              <i className="fa-solid fa-user-plus" />
+            </div>
+
+            <div>
+              <h5 className="fw-bold mb-1">
+                Thông tin người bệnh
+              </h5>
+
+              <div className="small text-secondary">
+                Nhập thông tin cơ bản để tạo lượt tiếp nhận.
+              </div>
+            </div>
+          </div>
+
+          <div className="row g-3">
+            <div className="col-lg-6">
+              <label className="form-label fw-semibold">
+                Họ và tên{' '}
+                <span className="text-danger">
+                  *
+                </span>
+              </label>
 
               <input
-                type="search"
-                className="form-control border-start-0 ps-0"
-                placeholder="Tìm mã lượt, tên người bệnh, dịch vụ..."
-                value={keyword}
+                type="text"
+                className="form-control"
+                value={
+                  form.fullName
+                }
                 onChange={(e) =>
-                  setKeyword(
+                  setField(
+                    'fullName',
+                    e.target.value
+                  )
+                }
+                required
+              />
+            </div>
+
+            <div className="col-lg-3">
+              <label className="form-label fw-semibold">
+                Số điện thoại{' '}
+                <span className="text-danger">
+                  *
+                </span>
+              </label>
+
+              <input
+                type="tel"
+                className="form-control"
+                value={
+                  form.phone
+                }
+                onChange={(e) =>
+                  setField(
+                    'phone',
+                    e.target.value
+                  )
+                }
+                required
+              />
+            </div>
+
+            <div className="col-lg-3">
+              <label className="form-label fw-semibold">
+                Email
+              </label>
+
+              <input
+                type="email"
+                className="form-control"
+                value={
+                  form.email
+                }
+                onChange={(e) =>
+                  setField(
+                    'email',
                     e.target.value
                   )
                 }
               />
             </div>
 
-            <div className="small text-secondary">
-              Tự động cập nhật mỗi 30 giây
+            <div className="col-lg-3">
+              <label className="form-label fw-semibold">
+                Ngày sinh
+              </label>
+
+              <input
+                type="date"
+                className="form-control"
+                max={today}
+                value={
+                  form.dateOfBirth
+                }
+                onChange={(e) =>
+                  setField(
+                    'dateOfBirth',
+                    e.target.value
+                  )
+                }
+              />
+            </div>
+
+            <div className="col-lg-3">
+              <label className="form-label fw-semibold">
+                Giới tính
+              </label>
+
+              <select
+                className="form-select"
+                value={
+                  form.gender
+                }
+                onChange={(e) =>
+                  setField(
+                    'gender',
+                    e.target.value
+                  )
+                }
+              >
+                <option value="">
+                  -- Chọn --
+                </option>
+
+                <option value="nam">
+                  Nam
+                </option>
+
+                <option value="nu">
+                  Nữ
+                </option>
+
+                <option value="khac">
+                  Khác
+                </option>
+              </select>
+            </div>
+
+            <div className="col-lg-6">
+              <label className="form-label fw-semibold">
+                Địa chỉ
+              </label>
+
+              <input
+                type="text"
+                className="form-control"
+                value={
+                  form.address
+                }
+                onChange={(e) =>
+                  setField(
+                    'address',
+                    e.target.value
+                  )
+                }
+              />
             </div>
           </div>
 
-          {loading ? (
-            <Loading text="Đang tải hàng chờ..." />
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-borderless table-hover align-middle mb-0">
-                <thead className="border-bottom" style={{ backgroundColor: '#fdfdfd' }}>
-                  <tr>
-                    <th className="py-3" style={{ width: 85 }}>
-                      STT
-                    </th>
-                    <th className="py-3">Mã lượt</th>
-                    <th className="py-3">Người bệnh</th>
-                    <th className="py-3">Dịch vụ</th>
-                    <th className="py-3">Phòng</th>
-                    <th className="py-3">Check-in</th>
-                    <th className="py-3">Trạng thái</th>
-                  </tr>
-                </thead>
+          <hr className="my-4 opacity-25" />
 
-                <tbody>
-                  {filteredQueue.length > 0 ? (
-                    filteredQueue.map((item, index) => (
-                      <tr key={item.id} className="border-bottom">
-                        <td>
-                          <span className="fw-bold fs-6">
-                            {item.queueNumber}
-                          </span>
-                        </td>
+          {/* SERVICE */}
 
-                        <td className="fw-semibold text-primary">
-                          {item.code}
-                        </td>
+          <h5 className="fw-bold mb-3">
+            Thông tin tiếp nhận
+          </h5>
 
-                        <td className="fw-bold">
-                          {item.patientName}
-                        </td>
+          <div className="row g-3">
+            <div className="col-lg-4">
+              <label className="form-label fw-semibold">
+                Loại dịch vụ
+              </label>
 
-                        <td>
-                          {item.service}
-                        </td>
+              <select
+                className="form-select"
+                value={
+                  form.serviceType
+                }
+                onChange={(e) =>
+                  handleServiceTypeChange(
+                    e.target.value
+                  )
+                }
+              >
+                <option value="EXAMINATION">
+                  Khám bệnh
+                </option>
 
-                        <td>
-                          {item.room}
-                        </td>
-
-                        <td>
-                          {item.checkInTime}
-                        </td>
-
-                        <td>
-                          <span
-                            className={`badge ${statusClass(item.status)} px-2 py-1`}
-                          >
-                            {statusText(item.status)}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan="7"
-                        className="text-center text-secondary py-5"
-                      >
-                        Hàng chờ hiện đang trống.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+                <option value="TEST">
+                  Xét nghiệm
+                </option>
+              </select>
             </div>
-          )}
+
+            {/* SPECIALTY */}
+
+            <div className="col-lg-4">
+              <label className="form-label fw-semibold">
+                Chuyên khoa
+                {form.serviceType ===
+                  'EXAMINATION' && (
+                  <span className="text-danger">
+                    {' '}*
+                  </span>
+                )}
+              </label>
+
+              <select
+                className="form-select"
+                value={
+                  form.specialtyId
+                }
+                disabled={
+                  optionsLoading
+                }
+                required={
+                  form.serviceType ===
+                  'EXAMINATION'
+                }
+                onChange={(e) => {
+                  setField(
+                    'specialtyId',
+                    e.target.value
+                  );
+
+                  setField(
+                    'testId',
+                    ''
+                  );
+                }}
+              >
+                <option value="">
+                  -- Chọn chuyên khoa --
+                </option>
+
+                {Object.entries(
+                  specialties
+                ).map(
+                  ([
+                    id,
+                    name,
+                  ]) => (
+                    <option
+                      key={
+                        id
+                      }
+                      value={
+                        id
+                      }
+                    >
+                      {
+                        name
+                      }
+                    </option>
+                  )
+                )}
+              </select>
+            </div>
+
+            {/* TEST */}
+
+            {form.serviceType ===
+              'TEST' && (
+              <div className="col-lg-4">
+                <label className="form-label fw-semibold">
+                  Loại xét nghiệm{' '}
+                  <span className="text-danger">
+                    *
+                  </span>
+                </label>
+
+                <select
+                  className="form-select"
+                  value={
+                    form.testId
+                  }
+                  required
+                  disabled={
+                    optionsLoading
+                  }
+                  onChange={(e) => {
+                    const testId =
+                      e.target.value;
+
+                    const selected =
+                      tests.find(
+                        (item) =>
+                          String(
+                            getTestId(
+                              item
+                            )
+                          ) ===
+                          String(
+                            testId
+                          )
+                      );
+
+                    setForm(
+                      (prev) => ({
+                        ...prev,
+
+                        testId,
+
+                        specialtyId:
+                          selected
+                            ? String(
+                                getTestSpecialty(
+                                  selected
+                                ) ||
+                                prev.specialtyId
+                              )
+                            : prev.specialtyId,
+                      })
+                    );
+                  }}
+                >
+                  <option value="">
+                    -- Chọn xét nghiệm --
+                  </option>
+
+                  {filteredTests.map(
+                    (item) => {
+                      const id =
+                        getTestId(
+                          item
+                        );
+
+                      const price =
+                        getTestPrice(
+                          item
+                        );
+
+                      return (
+                        <option
+                          key={
+                            id
+                          }
+                          value={
+                            id
+                          }
+                        >
+                          {getTestName(
+                            item
+                          )}
+                          {' - '}
+                          {price.toLocaleString(
+                            'vi-VN'
+                          )}
+                          {' đ'}
+                        </option>
+                      );
+                    }
+                  )}
+                </select>
+              </div>
+            )}
+
+            {/* REASON */}
+
+            <div
+              className={
+                form.serviceType ===
+                'TEST'
+                  ? 'col-lg-12'
+                  : 'col-lg-4'
+              }
+            >
+              <label className="form-label fw-semibold">
+                Lý do đến khám/xét nghiệm
+              </label>
+
+              <input
+                type="text"
+                className="form-control"
+                placeholder="Triệu chứng hoặc nhu cầu chính"
+                value={
+                  form.reason
+                }
+                onChange={(e) =>
+                  setField(
+                    'reason',
+                    e.target.value
+                  )
+                }
+              />
+            </div>
+
+            <div className="col-12">
+              <label className="form-label fw-semibold">
+                Ghi chú
+              </label>
+
+              <textarea
+                className="form-control"
+                rows="4"
+                maxLength={500}
+                placeholder="Thông tin bổ sung cho bác sĩ/kỹ thuật viên..."
+                value={
+                  form.notes
+                }
+                onChange={(e) =>
+                  setField(
+                    'notes',
+                    e.target.value
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          <div className="d-flex flex-wrap gap-2 mt-4">
+            <button
+              type="submit"
+              className="btn btn-primary"
+              disabled={
+                saving ||
+                optionsLoading
+              }
+            >
+              <i className="fa-solid fa-user-check me-2" />
+
+              {saving
+                ? 'Đang tiếp nhận...'
+                : 'Tạo lượt tiếp nhận'}
+            </button>
+
+            <button
+              type="button"
+              className="btn btn-outline-secondary"
+              disabled={
+                saving
+              }
+              onClick={() =>
+                setForm(
+                  EMPTY_FORM
+                )
+              }
+            >
+              Xóa biểu mẫu
+            </button>
+          </div>
         </div>
-      </div>
+      </form>
     </div>
   );
 }

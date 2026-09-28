@@ -76,6 +76,7 @@ export const rejectSpecimen =
 
 // =====================================================
 // WORKLIST
+// MODULE 5
 // =====================================================
 
 export const getWorklist =
@@ -121,6 +122,7 @@ export const completeWork =
 
 // =====================================================
 // RESULT ENTRY
+// MODULE 11
 // =====================================================
 
 export const getResultEntry =

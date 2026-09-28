@@ -1,3 +1,5 @@
+// src/pages/tracking/LichSuTruyVet.jsx
+
 import React, {
   useEffect,
   useMemo,
@@ -7,61 +9,125 @@ import React, {
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
 
-import { getTrackingHistory } from '../../services/trackingService';
-import { getApiErrorMessage } from '../../services/api';
+import {
+  getTrackingHistory,
+  getTrackingStatusLabel,
+} from '../../services/trackingService';
 
-const normalizeItem = (item = {}) => ({
-  id:
-    item.id ??
-    item.idTruyVet ??
-    item.IDTruyVet,
+import {
+  getApiErrorMessage,
+} from '../../services/api';
 
-  createdAt:
-    item.createdAt ??
-    item.thoiGian ??
-    item.ThoiGian ??
-    item.ngayTao ??
-    '—',
+// ============================================================
+// FORMAT
+// ============================================================
 
-  entityType:
-    item.entityType ??
-    item.loaiDoiTuong ??
-    item.LoaiDoiTuong ??
-    '—',
+const formatDateTime = (value) => {
+  if (!value) {
+    return '—';
+  }
 
-  entityCode:
-    item.entityCode ??
-    item.maDoiTuong ??
-    item.MaDoiTuong ??
-    '—',
+  const date =
+    new Date(value);
 
-  action:
-    item.action ??
-    item.hanhDong ??
-    item.HanhDong ??
-    '—',
+  if (!Number.isNaN(date.getTime())) {
+    return date.toLocaleString(
+      'vi-VN',
+      {
+        hour: '2-digit',
+        minute: '2-digit',
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+      }
+    );
+  }
 
-  actorName:
-    item.actorName ??
-    item.nguoiThucHien ??
-    item.NguoiThucHien ??
-    '—',
+  return String(value);
+};
 
-  note:
-    item.note ??
-    item.ghiChu ??
-    item.GhiChu ??
-    '—',
-});
+const objectTypeLabel = (type) => {
+  switch (
+    String(type || '').toLowerCase()
+  ) {
+    case 'datlichkham':
+      return 'Lịch khám';
+
+    case 'datlichxetnghiem':
+      return 'Lịch xét nghiệm';
+
+    case 'luotkham':
+      return 'Lượt khám';
+
+    case 'luotxetnghiem':
+      return 'Lượt xét nghiệm';
+
+    case 'phieuxetnghiem':
+      return 'Phiếu xét nghiệm';
+
+    case 'maubenhpham':
+      return 'Mẫu bệnh phẩm';
+
+    case 'worklist':
+      return 'Worklist';
+
+    case 'ketquaxetnghiem':
+      return 'Kết quả xét nghiệm';
+
+    default:
+      return type || 'Khác';
+  }
+};
+
+const objectTypeClass = (type) => {
+  switch (
+    String(type || '').toLowerCase()
+  ) {
+    case 'datlichkham':
+    case 'luotkham':
+      return 'bg-primary-subtle text-primary';
+
+    case 'datlichxetnghiem':
+    case 'luotxetnghiem':
+      return 'bg-success-subtle text-success';
+
+    case 'maubenhpham':
+      return 'bg-info-subtle text-info-emphasis';
+
+    case 'worklist':
+      return 'bg-warning-subtle text-warning-emphasis';
+
+    case 'ketquaxetnghiem':
+      return 'bg-danger-subtle text-danger';
+
+    default:
+      return 'bg-secondary-subtle text-secondary';
+  }
+};
+
+// ============================================================
+// COMPONENT
+// ============================================================
 
 export default function LichSuTruyVet() {
-  const [items, setItems] = useState([]);
+  const [items, setItems] =
+    useState([]);
 
-  const [keyword, setKeyword] = useState('');
-  const [entityType, setEntityType] = useState('');
+  const [keyword, setKeyword] =
+    useState('');
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const [type, setType] =
+    useState('');
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [error, setError] =
+    useState('');
+
+  // ==========================================================
+  // LOAD
+  // ==========================================================
 
   const loadHistory = async () => {
     try {
@@ -70,21 +136,20 @@ export default function LichSuTruyVet() {
 
       const data =
         await getTrackingHistory({
-          entityType:
-            entityType || undefined,
+          type:
+            type || undefined,
+
+          limit: 300,
         });
 
-      const list = Array.isArray(data)
-        ? data
-        : data?.content ||
-          data?.items ||
-          data?.data ||
-          [];
-
       setItems(
-        list.map(normalizeItem)
+        Array.isArray(data)
+          ? data
+          : []
       );
     } catch (err) {
+      setItems([]);
+
       setError(
         getApiErrorMessage(
           err,
@@ -98,31 +163,46 @@ export default function LichSuTruyVet() {
 
   useEffect(() => {
     loadHistory();
-  }, [entityType]);
+  }, [type]);
 
-  const filteredItems = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
+  // ==========================================================
+  // FILTER
+  // ==========================================================
 
-    if (!q) {
-      return items;
-    }
+  const filteredItems =
+    useMemo(() => {
+      const q =
+        keyword
+          .trim()
+          .toLowerCase();
 
-    return items.filter((item) =>
-      [
-        item.entityType,
-        item.entityCode,
-        item.action,
-        item.actorName,
-        item.note,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
-    );
-  }, [items, keyword]);
+      if (!q) {
+        return items;
+      }
+
+      return items.filter(
+        (item) =>
+          [
+            item.patientCode,
+            item.objectType,
+            item.objectId,
+            item.action,
+            item.description,
+            item.oldStatus,
+            item.newStatus,
+          ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase()
+            .includes(q)
+      );
+    }, [
+      items,
+      keyword,
+    ]);
 
   return (
-    <div>
+    <div className="container-fluid py-4">
       <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
         <div>
           <h1 className="dashboard-page-title mb-1">
@@ -130,15 +210,16 @@ export default function LichSuTruyVet() {
           </h1>
 
           <p className="text-secondary mb-0">
-            Theo dõi lịch sử thay đổi của lượt khám, phiếu xét nghiệm, mẫu và kết quả.
+            Nhật ký thay đổi trạng thái trong quá trình
+            khám và xét nghiệm.
           </p>
         </div>
 
         <button
           type="button"
           className="btn btn-outline-primary"
-          onClick={loadHistory}
           disabled={loading}
+          onClick={loadHistory}
         >
           <i className="fa-solid fa-rotate me-2" />
           Làm mới
@@ -149,54 +230,80 @@ export default function LichSuTruyVet() {
         <Notification
           type="danger"
           message={error}
-          onClose={() => setError('')}
+          onClose={() =>
+            setError('')
+          }
         />
       )}
 
       <div className="card border-0 shadow-sm rounded-4">
         <div className="card-body p-4">
+          {/* FILTER */}
+
           <div className="row g-3 mb-4">
             <div className="col-lg-8">
-              <input
-                type="search"
-                className="form-control"
-                placeholder="Tìm mã đối tượng, hành động, người thực hiện..."
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-              />
+              <div className="input-group">
+                <span className="input-group-text bg-white">
+                  <i className="fa-solid fa-magnifying-glass text-secondary" />
+                </span>
+
+                <input
+                  type="search"
+                  className="form-control"
+                  placeholder="Tìm hành động, mã đối tượng, trạng thái..."
+                  value={keyword}
+                  onChange={(e) =>
+                    setKeyword(
+                      e.target.value
+                    )
+                  }
+                />
+              </div>
             </div>
 
             <div className="col-lg-4">
               <select
                 className="form-select"
-                value={entityType}
+                value={type}
                 onChange={(e) =>
-                  setEntityType(
+                  setType(
                     e.target.value
                   )
                 }
               >
                 <option value="">
-                  Tất cả đối tượng
+                  Tất cả loại dữ liệu
                 </option>
 
-                <option value="VISIT">
+                <option value="datlichkham">
+                  Lịch khám
+                </option>
+
+                <option value="luotkham">
                   Lượt khám
                 </option>
 
-                <option value="TEST_VISIT">
+                <option value="datlichxetnghiem">
+                  Lịch xét nghiệm
+                </option>
+
+                <option value="luotxetnghiem">
                   Lượt xét nghiệm
                 </option>
 
-                <option value="TEST_ORDER">
+                <option value="phieuxetnghiem">
                   Phiếu xét nghiệm
                 </option>
 
-                <option value="SPECIMEN">
+                <option value="maubenhpham">
                   Mẫu bệnh phẩm
                 </option>
 
-                <option value="RESULT">
+                <option value="worklist">
+                  Worklist
+                </option>
+
+                <option value="ketquaxetnghiem">
                   Kết quả xét nghiệm
                 </option>
               </select>
@@ -206,80 +313,187 @@ export default function LichSuTruyVet() {
           {loading ? (
             <Loading text="Đang tải lịch sử truy vết..." />
           ) : (
-            <div className="table-responsive">
-              <table className="table table-hover align-middle">
-                <thead className="table-light">
-                  <tr>
-                    <th>
-                      Thời gian
-                    </th>
+            <>
+              <div className="d-flex justify-content-between align-items-center mb-3">
+                <small className="text-secondary">
+                  Tổng số:{' '}
+                  <strong>
+                    {filteredItems.length}
+                  </strong>{' '}
+                  bản ghi
+                </small>
+              </div>
 
-                    <th>
-                      Loại đối tượng
-                    </th>
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th style={{
+                        width: 70,
+                      }}>
+                        #
+                      </th>
 
-                    <th>
-                      Mã đối tượng
-                    </th>
+                      <th>
+                        Thời gian
+                      </th>
 
-                    <th>
-                      Hành động
-                    </th>
+                      <th>
+                        Loại
+                      </th>
 
-                    <th>
-                      Người thực hiện
-                    </th>
+                      <th>
+                        Mã
+                      </th>
 
-                    <th>
-                      Ghi chú
-                    </th>
-                  </tr>
-                </thead>
+                      <th>
+                        Hành động
+                      </th>
 
-                <tbody>
-                  {filteredItems.length > 0 ? (
-                    filteredItems.map((item, index) => (
-                      <tr key={item.id ?? index}>
-                        <td>
-                          {item.createdAt}
-                        </td>
+                      <th>
+                        Thay đổi trạng thái
+                      </th>
 
-                        <td>
-                          <span className="badge bg-primary-subtle text-primary">
-                            {item.entityType}
-                          </span>
-                        </td>
+                      <th>
+                        Nguồn
+                      </th>
+                    </tr>
+                  </thead>
 
-                        <td className="fw-semibold">
-                          {item.entityCode}
-                        </td>
+                  <tbody>
+                    {filteredItems.length >
+                    0 ? (
+                      filteredItems.map(
+                        (
+                          item,
+                          index
+                        ) => (
+                          <tr
+                            key={
+                              item.id ||
+                              index
+                            }
+                          >
+                            <td className="text-secondary">
+                              {index +
+                                1}
+                            </td>
 
-                        <td>
-                          {item.action}
-                        </td>
+                            <td className="text-nowrap">
+                              {formatDateTime(
+                                item.time
+                              )}
+                            </td>
 
-                        <td>
-                          {item.actorName}
-                        </td>
+                            <td>
+                              <span
+                                className={`badge ${objectTypeClass(
+                                  item.objectType
+                                )}`}
+                              >
+                                {objectTypeLabel(
+                                  item.objectType
+                                )}
+                              </span>
+                            </td>
 
-                        <td>
-                          {item.note}
+                            <td>
+                              <div className="fw-semibold">
+                                {item.objectId ||
+                                  '—'}
+                              </div>
+
+                              {item.patientCode && (
+                                <small className="text-secondary">
+                                  KH:{' '}
+                                  {
+                                    item.patientCode
+                                  }
+                                </small>
+                              )}
+                            </td>
+
+                            <td>
+                              <div className="fw-semibold">
+                                {item.action ||
+                                  'Cập nhật'}
+                              </div>
+
+                              {item.description && (
+                                <small className="text-secondary">
+                                  {
+                                    item.description
+                                  }
+                                </small>
+                              )}
+                            </td>
+
+                            <td>
+                              {item.oldStatus ||
+                              item.newStatus ? (
+                                <div className="d-flex flex-wrap align-items-center gap-2">
+                                  {item.oldStatus && (
+                                    <span className="badge bg-secondary-subtle text-secondary">
+                                      {getTrackingStatusLabel(
+                                        item.oldStatus
+                                      )}
+                                    </span>
+                                  )}
+
+                                  {item.oldStatus &&
+                                    item.newStatus && (
+                                      <i className="fa-solid fa-arrow-right small text-secondary" />
+                                    )}
+
+                                  {item.newStatus && (
+                                    <span className="badge bg-primary-subtle text-primary">
+                                      {getTrackingStatusLabel(
+                                        item.newStatus
+                                      )}
+                                    </span>
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-secondary">
+                                  —
+                                </span>
+                              )}
+                            </td>
+
+                            <td>
+                              <span
+                                className={`badge ${
+                                  item.source ===
+                                  'system'
+                                    ? 'bg-dark-subtle text-dark'
+                                    : 'bg-info-subtle text-info-emphasis'
+                                }`}
+                              >
+                                {item.source ===
+                                'system'
+                                  ? 'Hệ thống'
+                                  : 'Người dùng'}
+                              </span>
+                            </td>
+                          </tr>
+                        )
+                      )
+                    ) : (
+                      <tr>
+                        <td
+                          colSpan="7"
+                          className="text-center py-5 text-secondary"
+                        >
+                          <i className="fa-solid fa-clock-rotate-left fs-2 d-block mb-3 opacity-50" />
+
+                          Chưa có lịch sử truy vết phù hợp.
                         </td>
                       </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td
-                        colSpan="6"
-                        className="text-center text-secondary py-5"
-                      >
-                        Chưa có dữ liệu truy vết phù hợp.
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </>
           )}
         </div>
       </div>

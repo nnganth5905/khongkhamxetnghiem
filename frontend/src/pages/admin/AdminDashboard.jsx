@@ -1,238 +1,376 @@
+// src/pages/dashboard/AdminDashboard.jsx
+
 import React, {
   useEffect,
   useState,
 } from 'react';
 
+import {
+  Link,
+} from 'react-router-dom';
+
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
 
 import {
-  getAdminDashboardStats,
-  getAdminErrorMessage,
-  getAdminFiles,
-} from '../../services/adminService';
+  getAdminDashboard,
+} from '../../services/dashboardService';
 
-const DEFAULT_STATS = {
+import {
+  getApiErrorMessage,
+} from '../../services/api';
+
+// ============================================================
+// FALLBACK
+// ============================================================
+
+const FALLBACK = {
   totalCustomers: 0,
+  totalDoctors: 0,
   totalEmployees: 0,
-  totalTestOrders: 0,
-  totalResults: 0,
-  testCompletionPercent: 0,
+  totalTechnicians: 0,
+
+  todayAppointments: 0,
+
+  checkedInToday: 0,
+
+  waitingNow: 0,
+
+  pendingResults: 0,
+
+  activeWorklists: 0,
+
+  recentAppointments: [],
 };
 
-const formatFileSize = (
-  bytes
-) => {
-  const size =
-    Number(bytes || 0);
+// ============================================================
+// FORMAT
+// ============================================================
 
-  if (size <= 0) {
-    return '0 B';
+const formatDate = (value) => {
+  if (!value) {
+    return '—';
   }
 
-  const units = [
-    'B',
-    'KB',
-    'MB',
-    'GB',
-    'TB',
-  ];
-
-  const index =
-    Math.min(
-      Math.floor(
-        Math.log(size) /
-          Math.log(1024)
-      ),
-      units.length - 1
+  const text =
+    String(value).substring(
+      0,
+      10
     );
 
-  const value =
-    size /
-    Math.pow(
-      1024,
-      index
-    );
+  const parts =
+    text.split('-');
 
-  return `${value.toFixed(
-    index === 0
-      ? 0
-      : 2
-  )} ${units[index]}`;
+  return parts.length === 3
+    ? `${parts[2]}/${parts[1]}/${parts[0]}`
+    : text;
 };
 
+const appointmentStatus = (
+  status
+) => {
+  switch (
+    String(status || '').toLowerCase()
+  ) {
+    case 'pending':
+      return 'Chờ xác nhận';
+
+    case 'confirmed':
+      return 'Đã xác nhận';
+
+    case 'checked_in':
+      return 'Đã check-in';
+
+    case 'completed':
+      return 'Hoàn tất';
+
+    case 'cancelled':
+      return 'Đã hủy';
+
+    case 'no_show':
+      return 'Vắng mặt';
+
+    default:
+      return status || '—';
+  }
+};
+
+const statusClass = (status) => {
+  switch (
+    String(status || '').toLowerCase()
+  ) {
+    case 'pending':
+      return 'bg-warning-subtle text-warning-emphasis';
+
+    case 'confirmed':
+      return 'bg-primary-subtle text-primary';
+
+    case 'checked_in':
+      return 'bg-info-subtle text-info-emphasis';
+
+    case 'completed':
+      return 'bg-success-subtle text-success';
+
+    case 'cancelled':
+    case 'no_show':
+      return 'bg-danger-subtle text-danger';
+
+    default:
+      return 'bg-secondary-subtle text-secondary';
+  }
+};
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
 export default function AdminDashboard() {
-  const [stats, setStats] =
-    useState(
-      DEFAULT_STATS
-    );
+  const [
+    data,
+    setData,
+  ] = useState(FALLBACK);
 
   const [
-    statsLoading,
-    setStatsLoading,
+    loading,
+    setLoading,
   ] = useState(true);
 
   const [
-    filesLoading,
-    setFilesLoading,
-  ] = useState(true);
-
-  const [error, setError] =
-    useState('');
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
 
   const [
-    currentPath,
-    setCurrentPath,
+    error,
+    setError,
   ] = useState('');
 
-  const [
-    parentPath,
-    setParentPath,
-  ] = useState(null);
+  // ==========================================================
+  // LOAD
+  // ==========================================================
 
-  const [
-    directories,
-    setDirectories,
-  ] = useState([]);
-
-  const [files, setFiles] =
-    useState([]);
-
-  const loadStats =
-    async () => {
-      try {
-        setStatsLoading(
-          true
-        );
-
-        const data =
-          await getAdminDashboardStats();
-
-        setStats({
-          totalCustomers:
-            Number(
-              data?.totalCustomers ??
-                data?.tongKhachHang ??
-                0
-            ),
-
-          totalEmployees:
-            Number(
-              data?.totalEmployees ??
-                data?.tongNhanVien ??
-                0
-            ),
-
-          totalTestOrders:
-            Number(
-              data?.totalTestOrders ??
-                data?.tongPhieuXetNghiem ??
-                0
-            ),
-
-          totalResults:
-            Number(
-              data?.totalResults ??
-                data?.tongKetQua ??
-                0
-            ),
-
-          testCompletionPercent:
-            Number(
-              data?.testCompletionPercent ??
-                data?.tiLeHoanThanh ??
-                0
-            ),
-        });
-      } catch (err) {
-        setError(
-          getAdminErrorMessage(
-            err,
-            'Không thể tải thống kê.'
-          )
-        );
-      } finally {
-        setStatsLoading(
-          false
-        );
+  const load = async (
+    full = true
+  ) => {
+    try {
+      if (full) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
       }
-    };
 
-  const loadFiles =
-    async (
-      path = ''
-    ) => {
-      try {
-        setFilesLoading(
-          true
-        );
+      setError('');
 
-        const data =
-          await getAdminFiles(
-            path
-          );
+      const response =
+        await getAdminDashboard();
 
-        setCurrentPath(
-          data?.currentPath ??
-            path ??
-            ''
-        );
-
-        setParentPath(
-          data?.parentPath ??
-            null
-        );
-
-        setDirectories(
-          data?.directories ??
-            []
-        );
-
-        setFiles(
-          data?.files ?? []
-        );
-      } catch (err) {
-        setError(
-          getAdminErrorMessage(
-            err,
-            'Không thể tải danh sách file.'
-          )
-        );
-
-        setDirectories(
-          []
-        );
-
-        setFiles([]);
-      } finally {
-        setFilesLoading(
-          false
-        );
-      }
-    };
+      setData({
+        ...FALLBACK,
+        ...(response || {}),
+      });
+    } catch (err) {
+      setError(
+        getApiErrorMessage(
+          err,
+          'Không thể tải Dashboard quản trị.'
+        )
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    loadStats();
-    loadFiles('');
+    load();
   }, []);
 
-  const completion =
-    Math.max(
-      0,
-      Math.min(
-        100,
-        Number(
-          stats.testCompletionPercent ||
-            0
-        )
-      )
+  if (loading) {
+    return (
+      <Loading text="Đang tải Dashboard quản trị..." />
     );
+  }
+
+  const cards = [
+    {
+      label:
+        'Khách hàng',
+
+      value:
+        data.totalCustomers ??
+        0,
+
+      icon:
+        'fa-solid fa-users',
+
+      to:
+        '/admin/khach-hang',
+    },
+
+    {
+      label:
+        'Bác sĩ',
+
+      value:
+        data.totalDoctors ??
+        0,
+
+      icon:
+        'fa-solid fa-user-doctor',
+
+      to:
+        '/admin/bac-si',
+    },
+
+    {
+      label:
+        'Nhân viên',
+
+      value:
+        data.totalEmployees ??
+        0,
+
+      icon:
+        'fa-solid fa-id-card',
+
+      to:
+        '/admin/nhan-vien',
+    },
+
+    {
+      label:
+        'Kỹ thuật viên',
+
+      value:
+        data.totalTechnicians ??
+        0,
+
+      icon:
+        'fa-solid fa-microscope',
+
+      to:
+        '/admin/ktv',
+    },
+  ];
+
+  const operationCards = [
+    {
+      label:
+        'Lịch hẹn hôm nay',
+
+      value:
+        data.todayAppointments ??
+        0,
+
+      icon:
+        'fa-solid fa-calendar-day',
+
+      to:
+        '/admin/lich-hen',
+    },
+
+    {
+      label:
+        'Check-in hôm nay',
+
+      value:
+        data.checkedInToday ??
+        0,
+
+      icon:
+        'fa-solid fa-user-check',
+
+      to:
+        '/admin/lich-hen',
+    },
+
+    {
+      label:
+        'Đang trong quy trình',
+
+      value:
+        data.waitingNow ??
+        0,
+
+      icon:
+        'fa-solid fa-clock',
+
+      to:
+        '/admin/lich-hen',
+    },
+
+    {
+      label:
+        'Kết quả chờ duyệt',
+
+      value:
+        data.pendingResults ??
+        0,
+
+      icon:
+        'fa-solid fa-file-circle-exclamation',
+
+      to:
+        '/admin/bao-cao',
+    },
+
+    {
+      label:
+        'Worklist đang hoạt động',
+
+      value:
+        data.activeWorklists ??
+        0,
+
+      icon:
+        'fa-solid fa-list-check',
+
+      to:
+        '/admin/xet-nghiem',
+    },
+  ];
+
+  const appointments =
+    Array.isArray(
+      data.recentAppointments
+    )
+      ? data.recentAppointments
+      : [];
 
   return (
     <div>
-      <h1 className="dashboard-page-title">
-        Báo cáo thống kê
-      </h1>
+      {/* HEADER */}
+
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <h1 className="dashboard-page-title mb-1">
+            Tổng quan hệ thống
+          </h1>
+
+          <p className="text-secondary mb-0">
+            Theo dõi hoạt động khám bệnh và xét nghiệm.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          disabled={refreshing}
+          onClick={() =>
+            load(false)
+          }
+        >
+          <i
+            className={`fa-solid fa-rotate me-2 ${
+              refreshing
+                ? 'fa-spin'
+                : ''
+            }`}
+          />
+
+          Làm mới
+        </button>
+      </div>
 
       {error && (
         <Notification
@@ -244,263 +382,272 @@ export default function AdminDashboard() {
         />
       )}
 
-      {statsLoading ? (
-        <Loading text="Đang tải thống kê..." />
-      ) : (
-        <div className="dashboard-stats-row">
-          {/* KHÁCH HÀNG */}
+      {/* MASTER DATA */}
 
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-card-header">
-              <div className="dashboard-stat-card-title">
-                Tổng khách hàng
-              </div>
-
-              <div className="dashboard-stat-card-icon">
-                <i className="fa-solid fa-users-line" />
-              </div>
-            </div>
-
-            <div className="dashboard-stat-card-value">
-              {
-                stats.totalCustomers
-              }
-            </div>
-          </div>
-
-          {/* NHÂN VIÊN */}
-
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-card-header">
-              <div className="dashboard-stat-card-title">
-                Tổng nhân viên
-              </div>
-
-              <div className="dashboard-stat-card-icon">
-                <i className="fa-solid fa-users-gear" />
-              </div>
-            </div>
-
-            <div className="dashboard-stat-card-value">
-              {
-                stats.totalEmployees
-              }
-            </div>
-          </div>
-
-          {/* PHIẾU */}
-
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-card-header">
-              <div className="dashboard-stat-card-title">
-                Tổng phiếu xét
-                nghiệm
-              </div>
-
-              <div className="dashboard-stat-card-icon">
-                <i className="fa-solid fa-vial-virus" />
-              </div>
-            </div>
-
-            <div className="dashboard-stat-card-value">
-              {
-                stats.totalTestOrders
-              }
-
-              <div className="dashboard-progress-bar">
-                <div
-                  className="dashboard-progress-fill"
-                  style={{
-                    width:
-                      `${completion}%`,
-                  }}
-                />
-              </div>
-
-              <div className="small text-secondary mt-2 fw-normal">
-                {completion}% hoàn
-                thành
-              </div>
-            </div>
-          </div>
-
-          {/* KẾT QUẢ */}
-
-          <div className="dashboard-stat-card">
-            <div className="dashboard-stat-card-header">
-              <div className="dashboard-stat-card-title">
-                Tổng kết quả
-              </div>
-
-              <div className="dashboard-stat-card-icon">
-                <i className="fa-solid fa-square-poll-horizontal" />
-              </div>
-            </div>
-
-            <div className="dashboard-stat-card-value">
-              {
-                stats.totalResults
-              }
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ==================================================
-          FILE MANAGER
-      ================================================== */}
-
-      <div className="file-manager-section">
-        <div className="d-flex flex-wrap justify-content-between align-items-center gap-2">
-          <h2 className="mb-0">
-            Quản lý file
-          </h2>
-
-          <button
-            type="button"
-            className="btn btn-sm btn-outline-primary"
-            onClick={() =>
-              loadFiles(
-                currentPath
-              )
-            }
-            disabled={
-              filesLoading
-            }
-          >
-            <i className="fa-solid fa-rotate me-2" />
-
-            Làm mới
-          </button>
-        </div>
-
-        <div className="current-path">
-          <strong>
-            Đường dẫn hiện tại:
-          </strong>{' '}
-
-          {currentPath ||
-            '/'}
-        </div>
-
-        {parentPath !==
-          null && (
-          <button
-            type="button"
-            className="btn btn-outline-secondary btn-sm mb-3"
-            onClick={() =>
-              loadFiles(
-                parentPath
-              )
-            }
-          >
-            <i className="fa-solid fa-arrow-left me-2" />
-
-            Thư mục trước
-          </button>
-        )}
-
-        {filesLoading ? (
-          <Loading text="Đang tải file..." />
-        ) : (
-          <div className="file-manager">
-            {/* FOLDERS */}
-
-            <div className="file-manager-group">
-              <h3>
-                Thư mục
-              </h3>
-
-              <div className="file-items-grid">
-                {directories.length >
-                0 ? (
-                  directories.map(
-                    (
-                      dir,
-                      index
-                    ) => (
-                      <button
-                        type="button"
-                        key={
-                          dir.path ??
-                          index
-                        }
-                        className="file-item directory border"
-                        onClick={() =>
-                          loadFiles(
-                            dir.path
-                          )
-                        }
-                      >
-                        <div className="file-item-icon">
-                          <i className="fas fa-folder" />
-                        </div>
-
-                        <div className="file-item-name">
-                          {dir.name}
-                        </div>
-                      </button>
-                    )
-                  )
-                ) : (
-                  <p className="text-secondary small">
-                    Không có thư
-                    mục nào
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {/* FILES */}
-
-            <div className="file-manager-group">
-              <h3>
-                File
-              </h3>
-
-              <div className="file-items-grid">
-                {files.length >
-                0 ? (
-                  files.map(
-                    (
-                      file,
-                      index
-                    ) => (
-                      <div
-                        key={
-                          file.path ??
-                          index
-                        }
-                        className="file-item file"
-                      >
-                        <div className="file-item-icon">
-                          <i className="fas fa-file" />
-                        </div>
-
-                        <div className="file-item-name">
-                          {
-                            file.name
-                          }
-                        </div>
-
-                        <div className="file-item-size">
-                          {formatFileSize(
-                            file.size
-                          )}
-                        </div>
+      <div className="row g-4 mb-4">
+        {cards.map(
+          (card) => (
+            <div
+              className="col-md-6 col-xl-3"
+              key={card.label}
+            >
+              <Link
+                to={card.to}
+                className="card border-0 shadow-sm rounded-4 h-100 text-decoration-none text-dark"
+              >
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div className="small text-secondary">
+                        {card.label}
                       </div>
+
+                      <div className="fs-2 fw-bold mt-2">
+                        {card.value}
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-3 bg-primary-subtle text-primary d-flex align-items-center justify-content-center"
+                      style={{
+                        width: 50,
+                        height: 50,
+                      }}
+                    >
+                      <i
+                        className={`${card.icon} fs-5`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            </div>
+          )
+        )}
+      </div>
+
+      {/* OPERATION */}
+
+      <div className="card border-0 shadow-sm rounded-4 mb-4">
+        <div className="card-body p-4">
+          <h5 className="fw-bold mb-4">
+            Hoạt động nghiệp vụ
+          </h5>
+
+          <div className="row g-3">
+            {operationCards.map(
+              (card) => (
+                <div
+                  className="col-md-6 col-xl"
+                  key={card.label}
+                >
+                  <Link
+                    to={card.to}
+                    className="border rounded-4 p-3 d-flex justify-content-between align-items-center text-decoration-none text-dark h-100"
+                  >
+                    <div>
+                      <div className="small text-secondary">
+                        {card.label}
+                      </div>
+
+                      <div className="fs-4 fw-bold mt-1">
+                        {card.value}
+                      </div>
+                    </div>
+
+                    <i
+                      className={`${card.icon} text-primary fs-4`}
+                    />
+                  </Link>
+                </div>
+              )
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* QUICK MANAGEMENT */}
+
+      <div className="card border-0 shadow-sm rounded-4 mb-4">
+        <div className="card-body p-4">
+          <h5 className="fw-bold mb-3">
+            Quản lý nhanh
+          </h5>
+
+          <div className="d-flex flex-wrap gap-2">
+            <Link
+              to="/admin/chuyen-khoa"
+              className="btn btn-outline-primary"
+            >
+              Chuyên khoa
+            </Link>
+
+            <Link
+              to="/admin/phong"
+              className="btn btn-outline-primary"
+            >
+              Phòng
+            </Link>
+
+            <Link
+              to="/admin/lich-lam-viec"
+              className="btn btn-outline-primary"
+            >
+              Lịch làm việc
+            </Link>
+
+            <Link
+              to="/admin/xet-nghiem"
+              className="btn btn-outline-primary"
+            >
+              Xét nghiệm
+            </Link>
+
+            <Link
+              to="/admin/bao-cao"
+              className="btn btn-outline-primary"
+            >
+              Báo cáo
+            </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* APPOINTMENTS */}
+
+      <div className="card border-0 shadow-sm rounded-4">
+        <div className="card-body p-4">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h5 className="fw-bold mb-1">
+                Lịch hẹn sắp tới
+              </h5>
+
+              <small className="text-secondary">
+                Lịch khám và xét nghiệm gần nhất.
+              </small>
+            </div>
+
+            <Link
+              to="/admin/lich-hen"
+              className="small text-decoration-none"
+            >
+              Quản lý lịch hẹn
+            </Link>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>
+                    Mã
+                  </th>
+
+                  <th>
+                    Ngày
+                  </th>
+
+                  <th>
+                    Giờ
+                  </th>
+
+                  <th>
+                    Người bệnh
+                  </th>
+
+                  <th>
+                    Loại
+                  </th>
+
+                  <th>
+                    Dịch vụ
+                  </th>
+
+                  <th>
+                    Trạng thái
+                  </th>
+                </tr>
+              </thead>
+
+              <tbody>
+                {appointments.length >
+                0 ? (
+                  appointments.map(
+                    (
+                      item,
+                      index
+                    ) => (
+                      <tr
+                        key={
+                          item.id ??
+                          index
+                        }
+                      >
+                        <td className="fw-semibold text-primary">
+                          {item.id ||
+                            '—'}
+                        </td>
+
+                        <td>
+                          {formatDate(
+                            item.date
+                          )}
+                        </td>
+
+                        <td>
+                          {item.time ||
+                            '—'}
+                        </td>
+
+                        <td className="fw-semibold">
+                          {item.patientName ||
+                            '—'}
+                        </td>
+
+                        <td>
+                          {String(
+                            item.type ||
+                              ''
+                          ).toUpperCase() ===
+                          'TEST'
+                            ? 'Xét nghiệm'
+                            : 'Khám bệnh'}
+                        </td>
+
+                        <td>
+                          {item.serviceName ||
+                            '—'}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`badge ${statusClass(
+                              item.status
+                            )}`}
+                          >
+                            {appointmentStatus(
+                              item.status
+                            )}
+                          </span>
+                        </td>
+                      </tr>
                     )
                   )
                 ) : (
-                  <p className="text-secondary small">
-                    Không có file
-                    nào
-                  </p>
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className="text-center text-secondary py-5"
+                    >
+                      Chưa có lịch hẹn.
+                    </td>
+                  </tr>
                 )}
-              </div>
-            </div>
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
       </div>
     </div>
   );

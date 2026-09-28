@@ -1,286 +1,575 @@
-import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+// src/pages/dashboard/CustomerDashboard.jsx
+
+import React, {
+  useEffect,
+  useState,
+} from 'react';
+
+import {
+  Link,
+} from 'react-router-dom';
 
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
-import { getCustomerDashboard } from '../../services/dashboardService';
-import { getApiErrorMessage } from '../../services/api';
-import { useAuth } from '../../context/AuthContext';
+
+import {
+  getCustomerDashboard,
+} from '../../services/dashboardService';
+
+import {
+  getApiErrorMessage,
+} from '../../services/api';
+
+import {
+  useAuth,
+} from '../../context/AuthContext';
+
+// ============================================================
+// FALLBACK
+// ============================================================
 
 const FALLBACK = {
-  upcomingAppointment: null,
-  totalAppointments: 0,
-  availableResults: 0,
-  unreadNotifications: 0,
-  recentResults: [],
+  todayAppointments: 0,
+
+  upcomingAppointmentsCount: 0,
+
+  activeVisits: 0,
+
+  approvedResults: 0,
+
+  upcomingAppointments: [],
 };
 
-export default function CustomerDashboard() {
-  const { user } = useAuth();
+// ============================================================
+// FORMAT
+// ============================================================
 
-  const [data, setData] = useState(FALLBACK);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+const formatDate = (value) => {
+  if (!value) {
+    return '—';
+  }
+
+  const text =
+    String(value).substring(
+      0,
+      10
+    );
+
+  const parts =
+    text.split('-');
+
+  return parts.length === 3
+    ? `${parts[2]}/${parts[1]}/${parts[0]}`
+    : text;
+};
+
+const statusText = (status) => {
+  switch (
+    String(status || '').toLowerCase()
+  ) {
+    case 'pending':
+      return 'Chờ xác nhận';
+
+    case 'confirmed':
+      return 'Đã xác nhận';
+
+    case 'checked_in':
+      return 'Đã check-in';
+
+    case 'completed':
+      return 'Hoàn tất';
+
+    case 'cancelled':
+      return 'Đã hủy';
+
+    case 'no_show':
+      return 'Vắng mặt';
+
+    default:
+      return status || '—';
+  }
+};
+
+const statusClass = (status) => {
+  switch (
+    String(status || '').toLowerCase()
+  ) {
+    case 'pending':
+      return 'bg-warning-subtle text-warning-emphasis';
+
+    case 'confirmed':
+      return 'bg-primary-subtle text-primary';
+
+    case 'checked_in':
+      return 'bg-info-subtle text-info-emphasis';
+
+    case 'completed':
+      return 'bg-success-subtle text-success';
+
+    case 'cancelled':
+    case 'no_show':
+      return 'bg-danger-subtle text-danger';
+
+    default:
+      return 'bg-secondary-subtle text-secondary';
+  }
+};
+
+// ============================================================
+// COMPONENT
+// ============================================================
+
+export default function CustomerDashboard() {
+  const {
+    user,
+  } = useAuth();
+
+  const [
+    data,
+    setData,
+  ] = useState(FALLBACK);
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    refreshing,
+    setRefreshing,
+  ] = useState(false);
+
+  const [
+    error,
+    setError,
+  ] = useState('');
+
+  // ==========================================================
+  // LOAD
+  // ==========================================================
+
+  const load = async (
+    full = true
+  ) => {
+    try {
+      if (full) {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
+
+      setError('');
+
+      const response =
+        await getCustomerDashboard();
+
+      setData({
+        ...FALLBACK,
+        ...(response || {}),
+      });
+    } catch (err) {
+      setError(
+        getApiErrorMessage(
+          err,
+          'Không thể tải Dashboard khách hàng.'
+        )
+      );
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
 
   useEffect(() => {
-    let active = true;
-
-    const load = async () => {
-      try {
-        const response = await getCustomerDashboard();
-
-        if (active) {
-          setData({
-            ...FALLBACK,
-            ...(response || {}),
-          });
-        }
-      } catch (err) {
-        if (active) {
-          setError(
-            getApiErrorMessage(
-              err,
-              'Không thể tải Dashboard khách hàng.'
-            )
-          );
-        }
-      } finally {
-        if (active) {
-          setLoading(false);
-        }
-      }
-    };
-
     load();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
   if (loading) {
-    return <Loading text="Đang tải thông tin của bạn..." />;
+    return (
+      <Loading text="Đang tải Dashboard..." />
+    );
   }
+
+  const cards = [
+    {
+      label:
+        'Lịch hôm nay',
+
+      value:
+        data.todayAppointments ??
+        0,
+
+      icon:
+        'fa-solid fa-calendar-day',
+
+      to:
+        '/lich-hen',
+
+      bg:
+        '#eef4ff',
+
+      color:
+        '#0d6efd',
+    },
+
+    {
+      label:
+        'Lịch sắp tới',
+
+      value:
+        data.upcomingAppointmentsCount ??
+        0,
+
+      icon:
+        'fa-solid fa-calendar-check',
+
+      to:
+        '/lich-hen',
+
+      bg:
+        '#eefaf2',
+
+      color:
+        '#198754',
+    },
+
+    {
+      label:
+        'Đang xử lý',
+
+      value:
+        data.activeVisits ??
+        0,
+
+      icon:
+        'fa-solid fa-spinner',
+
+      to:
+        '/customer/theo-doi',
+
+      bg:
+        '#fff8e6',
+
+      color:
+        '#b7791f',
+    },
+
+    {
+      label:
+        'Kết quả đã duyệt',
+
+      value:
+        data.approvedResults ??
+        0,
+
+      icon:
+        'fa-solid fa-file-medical',
+
+      to:
+        '/customer/ket-qua',
+
+      bg:
+        '#f2efff',
+
+      color:
+        '#6f42c1',
+    },
+  ];
+
+  const upcoming =
+    Array.isArray(
+      data.upcomingAppointments
+    )
+      ? data.upcomingAppointments
+      : [];
 
   return (
     <div>
-      <div className="mb-4">
-        <h1 className="dashboard-page-title mb-1">
-          Xin chào,{' '}
-          {user?.fullName ??
-            user?.FullName ??
-            user?.name ??
-            'Khách hàng'}
-        </h1>
-        <p className="text-secondary mb-0">
-          Quản lý lịch hẹn, kết quả xét nghiệm và thông báo của bạn.
-        </p>
+      {/* HEADER */}
+
+      <div className="d-flex flex-wrap justify-content-between align-items-center gap-3 mb-4">
+        <div>
+          <h1 className="dashboard-page-title mb-1">
+            Xin chào,{' '}
+
+            {user?.fullName ??
+              user?.FullName ??
+              user?.name ??
+              user?.username ??
+              'Khách hàng'}
+          </h1>
+
+          <p className="text-secondary mb-0">
+            Theo dõi lịch hẹn, tiến trình khám và kết quả xét nghiệm.
+          </p>
+        </div>
+
+        <button
+          type="button"
+          className="btn btn-outline-primary"
+          disabled={refreshing}
+          onClick={() =>
+            load(false)
+          }
+        >
+          <i
+            className={`fa-solid fa-rotate me-2 ${
+              refreshing
+                ? 'fa-spin'
+                : ''
+            }`}
+          />
+
+          Làm mới
+        </button>
       </div>
 
       {error && (
         <Notification
           type="danger"
           message={error}
-          onClose={() => setError('')}
+          onClose={() =>
+            setError('')
+          }
         />
       )}
 
+      {/* CARDS */}
+
       <div className="row g-4 mb-4">
-        <div className="col-md-4">
-          <Link
-            to="/lich-hen"
-            className="card border-0 shadow-sm rounded-4 h-100 text-decoration-none text-dark"
-          >
-            <div className="card-body p-4">
-              <div className="small text-secondary">
-                Tổng lịch hẹn
-              </div>
-              <div className="fs-2 fw-bold mt-2">
-                {data.totalAppointments}
-              </div>
-              <div className="text-primary small mt-3">
-                Xem lịch hẹn
-                <i className="fa-solid fa-arrow-right ms-2" />
-              </div>
+        {cards.map(
+          (card) => (
+            <div
+              className="col-md-6 col-xl-3"
+              key={card.label}
+            >
+              <Link
+                to={card.to}
+                className="card border-0 shadow-sm rounded-4 h-100 text-decoration-none text-dark"
+              >
+                <div className="card-body p-4">
+                  <div className="d-flex justify-content-between align-items-start">
+                    <div>
+                      <div className="small text-secondary">
+                        {card.label}
+                      </div>
+
+                      <div className="fs-2 fw-bold mt-2">
+                        {card.value}
+                      </div>
+                    </div>
+
+                    <div
+                      className="rounded-3 d-flex align-items-center justify-content-center"
+                      style={{
+                        width: 50,
+                        height: 50,
+                        background:
+                          card.bg,
+                        color:
+                          card.color,
+                      }}
+                    >
+                      <i
+                        className={`${card.icon} fs-5`}
+                      />
+                    </div>
+                  </div>
+                </div>
+              </Link>
             </div>
+          )
+        )}
+      </div>
+
+      {/* QUICK ACTION */}
+
+      <div className="row g-4 mb-4">
+        <div className="col-md-6 col-xl-3">
+          <Link
+            to="/dat-lich"
+            className="btn btn-primary w-100 py-3 rounded-4"
+          >
+            <i className="fa-solid fa-calendar-plus me-2" />
+
+            Đặt lịch
           </Link>
         </div>
 
-        <div className="col-md-4">
+        <div className="col-md-6 col-xl-3">
           <Link
-            to="/ket-qua"
-            className="card border-0 shadow-sm rounded-4 h-100 text-decoration-none text-dark"
+            to="/customer/theo-doi"
+            className="btn btn-outline-primary w-100 py-3 rounded-4"
           >
-            <div className="card-body p-4">
-              <div className="small text-secondary">
-                Kết quả đã có
-              </div>
-              <div className="fs-2 fw-bold mt-2">
-                {data.availableResults}
-              </div>
-              <div className="text-primary small mt-3">
-                Xem kết quả
-                <i className="fa-solid fa-arrow-right ms-2" />
-              </div>
-            </div>
+            <i className="fa-solid fa-stethoscope me-2" />
+
+            Theo dõi khám
           </Link>
         </div>
 
-        <div className="col-md-4">
+        <div className="col-md-6 col-xl-3">
           <Link
-            to="/thong-bao"
-            className="card border-0 shadow-sm rounded-4 h-100 text-decoration-none text-dark"
+            to="/customer/theo-doi-xn"
+            className="btn btn-outline-success w-100 py-3 rounded-4"
           >
-            <div className="card-body p-4">
-              <div className="small text-secondary">
-                Thông báo chưa đọc
-              </div>
-              <div className="fs-2 fw-bold mt-2">
-                {data.unreadNotifications}
-              </div>
-              <div className="text-primary small mt-3">
-                Mở thông báo
-                <i className="fa-solid fa-arrow-right ms-2" />
-              </div>
-            </div>
+            <i className="fa-solid fa-flask-vial me-2" />
+
+            Theo dõi XN
+          </Link>
+        </div>
+
+        <div className="col-md-6 col-xl-3">
+          <Link
+            to="/customer/ket-qua"
+            className="btn btn-outline-secondary w-100 py-3 rounded-4"
+          >
+            <i className="fa-solid fa-file-medical me-2" />
+
+            Kết quả
           </Link>
         </div>
       </div>
 
-      <div className="row g-4">
-        <div className="col-lg-5">
-          <div className="card border-0 shadow-sm rounded-4 h-100">
-            <div className="card-body p-4">
-              <h5 className="fw-bold mb-4">
+      {/* UPCOMING */}
+
+      <div className="card border-0 shadow-sm rounded-4">
+        <div className="card-body p-4">
+          <div className="d-flex justify-content-between align-items-center mb-4">
+            <div>
+              <h5 className="fw-bold mb-1">
                 Lịch hẹn sắp tới
               </h5>
 
-              {data.upcomingAppointment ? (
-                <>
-                  <div className="small text-secondary">
-                    Dịch vụ
-                  </div>
-                  <div className="fw-bold fs-5 mb-3">
-                    {data.upcomingAppointment.serviceName ??
-                      data.upcomingAppointment.testName ??
-                      data.upcomingAppointment.type ??
-                      'Lịch hẹn Bio Medic'}
-                  </div>
-
-                  <div className="mb-2">
-                    <i className="fa-regular fa-calendar me-2 text-primary" />
-                    {data.upcomingAppointment.date ??
-                      data.upcomingAppointment.ngay ??
-                      '—'}
-                  </div>
-
-                  <div className="mb-2">
-                    <i className="fa-regular fa-clock me-2 text-primary" />
-                    {data.upcomingAppointment.time ??
-                      data.upcomingAppointment.gio ??
-                      '—'}
-                  </div>
-
-                  <div className="mb-4">
-                    <i className="fa-solid fa-user-doctor me-2 text-primary" />
-                    {data.upcomingAppointment.doctorName ??
-                      'Theo phân công'}
-                  </div>
-
-                  <Link
-                    to={data.upcomingAppointment.id ? `/lich-hen/${data.upcomingAppointment.id}` : "/lich-hen"}
-                    className="btn btn-outline-primary"
-                  >
-                    Xem lịch hẹn
-                  </Link>
-                </>
-              ) : (
-                <>
-                  <p className="text-secondary">
-                    Bạn chưa có lịch hẹn sắp tới.
-                  </p>
-
-                  <Link
-                    to="/dat-lich-xet-nghiem"
-                    className="btn btn-primary"
-                  >
-                    Đặt lịch ngay
-                  </Link>
-                </>
-              )}
+              <small className="text-secondary">
+                Các lịch đang chờ hoặc đã được xác nhận.
+              </small>
             </div>
+
+            <Link
+              to="/lich-hen"
+              className="small text-decoration-none"
+            >
+              Xem tất cả
+            </Link>
           </div>
-        </div>
 
-        <div className="col-lg-7">
-          <div className="card border-0 shadow-sm rounded-4 h-100">
-            <div className="card-body p-4">
-              <div className="d-flex justify-content-between align-items-center mb-4">
-                <h5 className="fw-bold mb-0">
-                  Kết quả gần đây
-                </h5>
-                <Link
-                  to="/ket-qua"
-                  className="small text-decoration-none"
-                >
-                  Xem tất cả
-                </Link>
-              </div>
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>
+                    Mã lịch
+                  </th>
 
-              <div className="table-responsive">
-                <table className="table align-middle">
-                  <thead className="table-light">
-                    <tr>
-                      <th>Xét nghiệm</th>
-                      <th>Ngày</th>
-                      <th>Trạng thái</th>
-                      <th />
-                    </tr>
-                  </thead>
+                  <th>
+                    Ngày
+                  </th>
 
-                  <tbody>
-                    {(data.recentResults || []).map((item, index) => (
-                      <tr key={item.id ?? index}>
-                        <td className="fw-semibold">
-                          {item.testName ??
-                            item.tenXetNghiem ??
+                  <th>
+                    Giờ
+                  </th>
+
+                  <th>
+                    Loại
+                  </th>
+
+                  <th>
+                    Dịch vụ
+                  </th>
+
+                  <th>
+                    Trạng thái
+                  </th>
+
+                  <th />
+                </tr>
+              </thead>
+
+              <tbody>
+                {upcoming.length >
+                0 ? (
+                  upcoming.map(
+                    (
+                      item,
+                      index
+                    ) => (
+                      <tr
+                        key={
+                          item.id ??
+                          index
+                        }
+                      >
+                        <td className="fw-semibold text-primary">
+                          {item.id ||
                             '—'}
                         </td>
+
                         <td>
-                          {item.date ??
-                            item.ngayXetNghiem ??
+                          {formatDate(
+                            item.date
+                          )}
+                        </td>
+
+                        <td>
+                          {item.time ||
                             '—'}
                         </td>
+
                         <td>
-                          <span className="badge bg-success-subtle text-success">
-                            {item.status ?? 'Có kết quả'}
+                          {String(
+                            item.type ||
+                              ''
+                          ).toUpperCase() ===
+                          'TEST'
+                            ? 'Xét nghiệm'
+                            : 'Khám bệnh'}
+                        </td>
+
+                        <td>
+                          {item.serviceName ||
+                            '—'}
+                        </td>
+
+                        <td>
+                          <span
+                            className={`badge ${statusClass(
+                              item.status
+                            )}`}
+                          >
+                            {statusText(
+                              item.status
+                            )}
                           </span>
                         </td>
+
                         <td className="text-end">
                           <Link
-                            to={`/ket-qua/${item.id}`}
+                            to={`/lich-hen/${encodeURIComponent(
+                              item.id ??
+                                ''
+                            )}`}
                             className="btn btn-sm btn-outline-primary"
                           >
-                            Xem
+                            Chi tiết
                           </Link>
                         </td>
                       </tr>
-                    ))}
+                    )
+                  )
+                ) : (
+                  <tr>
+                    <td
+                      colSpan="7"
+                      className="text-center text-secondary py-5"
+                    >
+                      <i className="fa-solid fa-calendar-xmark fs-2 d-block mb-3 opacity-50" />
 
-                    {(data.recentResults || []).length === 0 && (
-                      <tr>
-                        <td
-                          colSpan="4"
-                          className="text-center text-secondary py-4"
-                        >
-                          Chưa có kết quả gần đây.
-                        </td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
+                      Bạn chưa có lịch hẹn sắp tới.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

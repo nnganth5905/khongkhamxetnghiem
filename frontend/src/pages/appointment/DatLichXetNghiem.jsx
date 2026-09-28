@@ -3,6 +3,7 @@ import React, {
   useMemo,
   useState,
 } from 'react';
+
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
@@ -10,54 +11,148 @@ import {
   createTestAppointment,
   getAppointmentOptions,
   getApiErrorMessage,
-  getTakenTimes,
+  getAvailableTimeSlots,
 } from '../../services/appointmentService';
 
-const generateSlots = (
-  start = '07:00',
-  end = '16:00',
-  stepMinutes = 60
-) => {
-  const slots = [];
-  const [startHour, startMin] = start.split(':').map(Number);
-  const [endHour, endMin] = end.split(':').map(Number);
-  const current = new Date();
-  current.setHours(startHour, startMin, 0, 0);
-  const endTime = new Date();
-  endTime.setHours(endHour, endMin, 0, 0);
-
-  while (current <= endTime) {
-    const hh = String(current.getHours()).padStart(2, '0');
-    const mm = String(current.getMinutes()).padStart(2, '0');
-    slots.push(`${hh}:${mm}`);
-    current.setMinutes(current.getMinutes() + stepMinutes);
-  }
-  return slots;
-};
-
-const SLOTS = generateSlots('07:00', '16:00', 60);
+// =====================================================
+// HELPERS
+// =====================================================
 
 const sameCK = (a, b) => {
-  const A = String(a ?? '').toUpperCase();
-  const B = String(b ?? '').toUpperCase();
-  if (!A || !B) return false;
-  if (A === B) return true;
-  const na = A.replace(/\D/g, '');
-  const nb = B.replace(/\D/g, '');
-  return Boolean(na && nb && na === nb);
+  const A =
+    String(a ?? '')
+      .toUpperCase();
+
+  const B =
+    String(b ?? '')
+      .toUpperCase();
+
+  if (!A || !B) {
+    return false;
+  }
+
+  if (A === B) {
+    return true;
+  }
+
+  const na =
+    A.replace(
+      /\D/g,
+      ''
+    );
+
+  const nb =
+    B.replace(
+      /\D/g,
+      ''
+    );
+
+  return Boolean(
+    na &&
+    nb &&
+    na === nb
+  );
 };
 
 const getLocalToday = () => {
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = String(now.getMonth() + 1).padStart(2, '0');
-  const day = String(now.getDate()).padStart(2, '0');
+  const now =
+    new Date();
+
+  const year =
+    now.getFullYear();
+
+  const month =
+    String(
+      now.getMonth() + 1
+    ).padStart(
+      2,
+      '0'
+    );
+
+  const day =
+    String(
+      now.getDate()
+    ).padStart(
+      2,
+      '0'
+    );
+
   return `${year}-${month}-${day}`;
 };
 
-const getUserName = (user) => user?.FullName || user?.fullName || user?.HoTen || user?.hoTen || '';
-const getUserEmail = (user) => user?.Email || user?.email || '';
-const getUserPhone = (user) => user?.Phone || user?.phone || user?.SoDienThoai || user?.sodienthoai || user?.sdt || user?.phoneNumber || '';
+const getUserName = (user) =>
+  user?.FullName ||
+  user?.fullName ||
+  user?.HoTen ||
+  user?.hoTen ||
+  user?.TenKhachHang ||
+  user?.tenKhachHang ||
+  '';
+
+const getUserEmail = (user) =>
+  user?.Email ||
+  user?.email ||
+  '';
+
+const getUserPhone = (user) =>
+  user?.Phone ||
+  user?.phone ||
+  user?.SoDienThoai ||
+  user?.soDienThoai ||
+  user?.sodienthoai ||
+  user?.sdt ||
+  user?.phoneNumber ||
+  '';
+
+const getDoctorId = (doctor) =>
+  doctor?.IDBacSi ??
+  doctor?.id ??
+  doctor?.doctorId;
+
+const getDoctorName = (doctor) =>
+  doctor?.TenBacSi ??
+  doctor?.doctorName ??
+  doctor?.name ??
+  'Bác sĩ';
+
+const getDoctorSpecialtyId = (doctor) =>
+  doctor?.KhoaID ??
+  doctor?.khoaId ??
+  doctor?.specialtyId ??
+  doctor?.SpecialtyId;
+
+const getDoctorFacilityId = (doctor) =>
+  doctor?.CoSoID ??
+  doctor?.coSoId ??
+  doctor?.facilityId ??
+  doctor?.FacilityId ??
+  null;
+
+const getTestId = (test) =>
+  test?.IDXetNghiem ??
+  test?.id ??
+  test?.testId;
+
+const getTestName = (test) =>
+  test?.TenXetNghiem ??
+  test?.name ??
+  test?.testName ??
+  'Xét nghiệm';
+
+const getTestPrice = (test) =>
+  test?.Gia ??
+  test?.price ??
+  0;
+
+const getTestSpecialtyId = (test) =>
+  test?.ChuyenKhoaID ??
+  test?.chuyenKhoaId ??
+  test?.specialtyId ??
+  test?.categoryId;
+
+// =====================================================
+// COMPONENT
+// =====================================================
 
 export default function DatLichXetNghiem({
   departments: departmentsProp = null,
@@ -65,32 +160,134 @@ export default function DatLichXetNghiem({
   allDoctors: allDoctorsProp = null,
   currentUser: currentUserProp = null,
 }) {
-  const navigate = useNavigate();
-  const { user: authUser } = useAuth(); 
+  const navigate =
+    useNavigate();
 
-  const [departments, setDepartments] = useState(departmentsProp || {});
-  const [allTests, setAllTests] = useState(allTestsProp || []);
-  const [allDoctors, setAllDoctors] = useState(allDoctorsProp || []);
-  
-  const [currentUser, setCurrentUser] = useState(currentUserProp || authUser || null);
+  const {
+    user: authUser,
+  } = useAuth();
 
-  const [selectedCK, setSelectedCK] = useState('');
-  const [selectedXN, setSelectedXN] = useState('');
-  const [selectedDoctor, setSelectedDoctor] = useState('');
-  const [selectedDate, setSelectedDate] = useState('');
-  const [selectedTime, setSelectedTime] = useState('');
-  const [note, setNote] = useState('');
-  const [forOther, setForOther] = useState(false);
+  // =====================================================
+  // OPTIONS
+  // =====================================================
 
-  const [selfInfo, setSelfInfo] = useState({
-    hoten: getUserName(currentUserProp || authUser),
-    sdt: getUserPhone(currentUserProp || authUser),
+  const [
+    departments,
+    setDepartments,
+  ] = useState(
+    departmentsProp ||
+    {}
+  );
+
+  const [
+    allTests,
+    setAllTests,
+  ] = useState(
+    allTestsProp ||
+    []
+  );
+
+  const [
+    allDoctors,
+    setAllDoctors,
+  ] = useState(
+    allDoctorsProp ||
+    []
+  );
+
+  const [
+    currentUser,
+    setCurrentUser,
+  ] = useState(
+    currentUserProp ||
+    authUser ||
+    null
+  );
+
+  // =====================================================
+  // APPOINTMENT
+  // =====================================================
+
+  const [
+    selectedCK,
+    setSelectedCK,
+  ] = useState('');
+
+  const [
+    selectedXN,
+    setSelectedXN,
+  ] = useState('');
+
+  const [
+    selectedDoctor,
+    setSelectedDoctor,
+  ] = useState('');
+
+  const [
+    selectedDate,
+    setSelectedDate,
+  ] = useState('');
+
+  const [
+    selectedTime,
+    setSelectedTime,
+  ] = useState('');
+
+  const [
+    availableSlots,
+    setAvailableSlots,
+  ] = useState([]);
+
+  const [
+    slotsLoading,
+    setSlotsLoading,
+  ] = useState(false);
+
+  const [
+    note,
+    setNote,
+  ] = useState('');
+
+  // =====================================================
+  // PATIENT
+  // =====================================================
+
+  const [
+    forOther,
+    setForOther,
+  ] = useState(false);
+
+  const [
+    selfInfo,
+    setSelfInfo,
+  ] = useState({
+    hoten:
+      getUserName(
+        currentUserProp ||
+        authUser
+      ),
+
+    sdt:
+      getUserPhone(
+        currentUserProp ||
+        authUser
+      ),
+
     gioitinh: '',
+
     ngaysinh: '',
-    email: getUserEmail(currentUserProp || authUser),
+
+    email:
+      getUserEmail(
+        currentUserProp ||
+        authUser
+      ),
   });
 
-  const [otherInfo, setOtherInfo] = useState({
+  const [
+    otherInfo,
+    setOtherInfo,
+  ] = useState({
     p_name: '',
     p_phone: '',
     p_gender: '',
@@ -98,291 +295,831 @@ export default function DatLichXetNghiem({
     p_email: '',
   });
 
-  const [takenTimes, setTakenTimes] = useState(new Set());
-  const [errMsg, setErrMsg] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [
+    errMsg,
+    setErrMsg,
+  ] = useState('');
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(false);
+
+  // =====================================================
+  // AUTH
+  // =====================================================
 
   useEffect(() => {
-    if (authUser) {
-      setCurrentUser(authUser);
-      setSelfInfo((prev) => ({
-        ...prev,
-        hoten: prev.hoten || getUserName(authUser),
-        email: prev.email || getUserEmail(authUser),
-        sdt: prev.sdt || getUserPhone(authUser),
-      }));
+    if (!authUser) {
+      return;
     }
+
+    setCurrentUser(
+      authUser
+    );
+
+    setSelfInfo(
+      (prev) => ({
+        ...prev,
+
+        hoten:
+          prev.hoten ||
+          getUserName(
+            authUser
+          ),
+
+        email:
+          prev.email ||
+          getUserEmail(
+            authUser
+          ),
+
+        sdt:
+          prev.sdt ||
+          getUserPhone(
+            authUser
+          ),
+      })
+    );
   }, [authUser]);
 
+  // =====================================================
+  // LOAD OPTIONS
+  // =====================================================
+
   useEffect(() => {
     let active = true;
-    const shouldLoad = !departmentsProp || !allTestsProp || !allDoctorsProp || !currentUserProp;
 
-    if (!shouldLoad) return undefined;
+    const shouldLoad =
+      !departmentsProp ||
+      !allTestsProp ||
+      !allDoctorsProp;
 
-    const loadOptions = async () => {
-      try {
-        const data = await getAppointmentOptions();
-        if (!active) return;
+    if (!shouldLoad) {
+      return undefined;
+    }
 
-        if (!departmentsProp) {
-          setDepartments(data?.departments || data?.chuyenKhoa || {});
+    const loadOptions =
+      async () => {
+        try {
+          const data =
+            await getAppointmentOptions();
+
+          if (!active) {
+            return;
+          }
+
+          if (!departmentsProp) {
+            setDepartments(
+              data?.departments ||
+              data?.chuyenKhoa ||
+              {}
+            );
+          }
+
+          if (!allTestsProp) {
+            setAllTests(
+              data?.tests ||
+              data?.allTests ||
+              []
+            );
+          }
+
+          if (!allDoctorsProp) {
+            setAllDoctors(
+              data?.doctors ||
+              data?.allDoctors ||
+              []
+            );
+          }
+
+          if (
+            !currentUserProp &&
+            !authUser
+          ) {
+            setCurrentUser(
+              data?.currentUser ||
+              data?.user ||
+              null
+            );
+          }
+        } catch (error) {
+          if (!active) {
+            return;
+          }
+
+          setErrMsg(
+            getApiErrorMessage(
+              error,
+              'Không thể tải dữ liệu đặt lịch.'
+            )
+          );
         }
-        if (!allTestsProp) {
-          setAllTests(data?.tests || data?.allTests || []);
-        }
-        if (!allDoctorsProp) {
-          setAllDoctors(data?.doctors || data?.allDoctors || []);
-        }
-        if (!currentUserProp && !authUser) {
-          setCurrentUser(data?.currentUser || data?.user || null);
-        }
-      } catch (error) {
-        if (active) {
-          setErrMsg(getApiErrorMessage(error, 'Không thể tải dữ liệu đặt lịch.'));
-        }
-      }
-    };
+      };
 
     loadOptions();
-    return () => { active = false; };
-  }, [departmentsProp, allTestsProp, allDoctorsProp, currentUserProp, authUser]);
+
+    return () => {
+      active = false;
+    };
+  }, [
+    departmentsProp,
+    allTestsProp,
+    allDoctorsProp,
+    currentUserProp,
+    authUser,
+  ]);
+
+  // =====================================================
+  // PROFILE
+  // =====================================================
 
   useEffect(() => {
-    if (!currentUser) return;
-    setSelfInfo((prev) => ({
-      ...prev,
-      hoten: prev.hoten || getUserName(currentUser),
-      email: prev.email || getUserEmail(currentUser),
-      sdt: prev.sdt || getUserPhone(currentUser),
-    }));
-  }, [currentUser]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const prefillCK = params.get('khoa') || params.get('ck') || '';
-    const prefillIdbs = params.get('idbs') || '';
-    const prefillIdxn = params.get('idxn') || '';
-    const prefillNote = params.get('note') || '';
-    const prefillDate = params.get('date') || '';
-    const prefillTime = params.get('time') || '';
-
-    if (prefillCK) {
-      setSelectedCK(prefillCK);
-    } else if (Object.keys(departments).length > 0) {
-      setSelectedCK((current) => current || Object.keys(departments)[0]);
+    if (!currentUser) {
+      return;
     }
 
-    if (prefillIdxn) setSelectedXN(prefillIdxn);
-    if (prefillIdbs) setSelectedDoctor(prefillIdbs);
-    if (prefillNote) setNote(prefillNote);
-    if (prefillDate) setSelectedDate(prefillDate);
-    if (prefillTime) setSelectedTime(prefillTime);
-  }, [departments]);
+    setSelfInfo(
+      (prev) => ({
+        ...prev,
 
-  const filteredTests = useMemo(() => {
-    return allTests.filter((test) =>
-      // ĐÃ BỔ SUNG `test.categoryId` để nhận diện đúng dữ liệu từ Backend
-      sameCK(test.ChuyenKhoaID ?? test.chuyenKhoaId ?? test.specialtyId ?? test.categoryId, selectedCK)
-    );
-  }, [allTests, selectedCK]);
+        hoten:
+          prev.hoten ||
+          getUserName(
+            currentUser
+          ),
 
-  const filteredDoctors = useMemo(() => {
-    return allDoctors.filter((doctor) =>
-      sameCK(doctor.KhoaID ?? doctor.khoaId ?? doctor.specialtyId, selectedCK)
+        email:
+          prev.email ||
+          getUserEmail(
+            currentUser
+          ),
+
+        sdt:
+          prev.sdt ||
+          getUserPhone(
+            currentUser
+          ),
+      })
     );
-  }, [allDoctors, selectedCK]);
+  }, [currentUser]);
+
+  // =====================================================
+  // QUERY PARAMS
+  // =====================================================
 
   useEffect(() => {
-    if (!selectedDoctor || !selectedDate) {
-      setTakenTimes(new Set());
-      return;
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const prefillCK =
+      params.get('khoa') ||
+      params.get('ck') ||
+      '';
+
+    const prefillIdbs =
+      params.get('idbs') ||
+      '';
+
+    const prefillIdxn =
+      params.get('idxn') ||
+      '';
+
+    const prefillNote =
+      params.get('note') ||
+      '';
+
+    const prefillDate =
+      params.get('date') ||
+      '';
+
+    const prefillTime =
+      params.get('time') ||
+      '';
+
+    if (prefillCK) {
+      setSelectedCK(
+        prefillCK
+      );
+    } else if (
+      Object.keys(
+        departments
+      ).length > 0
+    ) {
+      setSelectedCK(
+        (current) =>
+          current ||
+          Object.keys(
+            departments
+          )[0]
+      );
+    }
+
+    if (prefillIdxn) {
+      setSelectedXN(
+        prefillIdxn
+      );
+    }
+
+    if (prefillIdbs) {
+      setSelectedDoctor(
+        prefillIdbs
+      );
+    }
+
+    if (prefillNote) {
+      setNote(
+        prefillNote
+      );
+    }
+
+    if (prefillDate) {
+      setSelectedDate(
+        prefillDate
+      );
+    }
+
+    if (prefillTime) {
+      setSelectedTime(
+        prefillTime
+      );
+    }
+  }, [departments]);
+
+  // =====================================================
+  // FILTER TESTS
+  // =====================================================
+
+  const filteredTests =
+    useMemo(
+      () =>
+        allTests.filter(
+          (test) =>
+            sameCK(
+              getTestSpecialtyId(
+                test
+              ),
+              selectedCK
+            )
+        ),
+      [
+        allTests,
+        selectedCK,
+      ]
+    );
+
+  // =====================================================
+  // FILTER DOCTORS
+  // =====================================================
+
+  const filteredDoctors =
+    useMemo(
+      () =>
+        allDoctors.filter(
+          (doctor) =>
+            sameCK(
+              getDoctorSpecialtyId(
+                doctor
+              ),
+              selectedCK
+            )
+        ),
+      [
+        allDoctors,
+        selectedCK,
+      ]
+    );
+
+  // =====================================================
+  // LOAD REAL SLOTS
+  // =====================================================
+
+  useEffect(() => {
+    if (
+      !selectedDoctor ||
+      !selectedDate
+    ) {
+      setAvailableSlots([]);
+      setSelectedTime('');
+
+      return undefined;
     }
 
     let active = true;
-    const loadTakenTimes = async () => {
-      try {
-        const data = await getTakenTimes('TEST', selectedDoctor, selectedDate);
-        if (!active) return;
-        const times = Array.isArray(data) ? data : data?.times || [];
-        setTakenTimes(new Set(times.map((time) => String(time).substring(0, 5))));
-      } catch {
-        if (active) setTakenTimes(new Set());
-      }
+
+    const loadSlots =
+      async () => {
+        try {
+          setSlotsLoading(true);
+
+          const data =
+            await getAvailableTimeSlots({
+              type: 'TEST',
+
+              doctorId:
+                selectedDoctor,
+
+              date:
+                selectedDate,
+            });
+
+          if (!active) {
+            return;
+          }
+
+          const slots =
+            Array.isArray(data)
+              ? data
+              : data?.slots || [];
+
+          const normalizedSlots =
+            slots.map(
+              (time) =>
+                String(time)
+                  .substring(0, 5)
+            );
+
+          setAvailableSlots(
+            normalizedSlots
+          );
+
+          setSelectedTime(
+            (current) =>
+              normalizedSlots.includes(
+                current
+              )
+                ? current
+                : ''
+          );
+        } catch (error) {
+          if (!active) {
+            return;
+          }
+
+          setAvailableSlots([]);
+          setSelectedTime('');
+
+          setErrMsg(
+            getApiErrorMessage(
+              error,
+              'Không thể tải khung giờ làm việc của bác sĩ.'
+            )
+          );
+        } finally {
+          if (active) {
+            setSlotsLoading(false);
+          }
+        }
+      };
+
+    loadSlots();
+
+    return () => {
+      active = false;
     };
+  }, [
+    selectedDoctor,
+    selectedDate,
+  ]);
 
-    loadTakenTimes();
-    return () => { active = false; };
-  }, [selectedDoctor, selectedDate]);
+  // =====================================================
+  // SUBMIT
+  // =====================================================
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setErrMsg('');
+  const handleSubmit =
+    async (e) => {
+      e.preventDefault();
 
-    if (!selectedXN || !selectedDoctor || !selectedDate || !selectedTime) {
-      setErrMsg('Vui lòng chọn xét nghiệm, bác sĩ, ngày và giờ.');
-      return;
-    }
+      setErrMsg('');
 
-    let finalName = forOther ? otherInfo.p_name.trim() : selfInfo.hoten.trim();
-    let finalPhone = forOther ? otherInfo.p_phone.trim() : selfInfo.sdt.trim();
-    let finalEmail = forOther ? otherInfo.p_email.trim() : selfInfo.email.trim();
-    
-    let finalGender = forOther ? otherInfo.p_gender : selfInfo.gioitinh;
-    let finalDob = forOther ? otherInfo.p_dob : selfInfo.ngaysinh;
+      if (
+        !selectedCK ||
+        !selectedXN ||
+        !selectedDoctor ||
+        !selectedDate ||
+        !selectedTime
+      ) {
+        setErrMsg(
+          'Vui lòng chọn đầy đủ chuyên khoa, xét nghiệm, bác sĩ, ngày và giờ.'
+        );
 
-    if (forOther) {
-      if (!finalName || !finalPhone || !finalEmail) {
-        setErrMsg('Vui lòng nhập đầy đủ Họ tên, SĐT và Email của người xét nghiệm.');
         return;
       }
-    } else {
+
+      if (
+        availableSlots.length > 0 &&
+        !availableSlots.includes(
+          selectedTime
+        )
+      ) {
+        setErrMsg(
+          'Khung giờ đã chọn không còn khả dụng. Vui lòng chọn lại.'
+        );
+
+        return;
+      }
+
+      const finalName =
+        forOther
+          ? otherInfo.p_name.trim()
+          : selfInfo.hoten.trim();
+
+      const finalPhone =
+        forOther
+          ? otherInfo.p_phone.trim()
+          : selfInfo.sdt.trim();
+
+      const finalEmail =
+        forOther
+          ? otherInfo.p_email.trim()
+          : selfInfo.email.trim();
+
+      const finalGender =
+        forOther
+          ? otherInfo.p_gender
+          : selfInfo.gioitinh;
+
+      const finalDob =
+        forOther
+          ? otherInfo.p_dob
+          : selfInfo.ngaysinh;
+
+      if (!finalName) {
+        setErrMsg(
+          'Họ tên không được để trống.'
+        );
+
+        return;
+      }
+
       if (!finalPhone) {
-        setErrMsg('Hệ thống không tìm thấy Số điện thoại của bạn. Vui lòng tải lại trang hoặc cập nhật hồ sơ.');
+        setErrMsg(
+          'Số điện thoại không được để trống.'
+        );
+
         return;
       }
-    }
 
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(finalEmail)) {
-      setErrMsg('Vui lòng nhập email hợp lệ (hệ thống sẽ gửi thư xác nhận/ cảm ơn).');
-      return;
-    }
+      if (
+        !finalEmail ||
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(
+          finalEmail
+        )
+      ) {
+        setErrMsg(
+          'Vui lòng nhập email hợp lệ.'
+        );
 
-    const payload = {
-      hoten: finalName,
-      email: finalEmail,
-      sodienthoai: finalPhone,
-      gioitinh: finalGender, 
-      ngaysinh: finalDob,    
-      ngay: selectedDate,
-      gio: selectedTime,
-      idbacsi: selectedDoctor,
-      idxetnghiem: selectedXN,
-      idcoso: "CS001",
-      ghichu: note
+        return;
+      }
+
+      const selectedDoctorInfo =
+        allDoctors.find(
+          (doctor) =>
+            String(
+              getDoctorId(
+                doctor
+              )
+            ) ===
+            String(
+              selectedDoctor
+            )
+        );
+
+      const facilityId =
+        getDoctorFacilityId(
+          selectedDoctorInfo
+        );
+
+      const payload = {
+        hoten:
+          finalName,
+
+        email:
+          finalEmail,
+
+        sodienthoai:
+          finalPhone,
+
+        gioitinh:
+          finalGender || 'khac',
+
+        ngaysinh:
+          finalDob || null,
+
+        ngay:
+          selectedDate,
+
+        gio:
+          selectedTime,
+
+        idbacsi:
+          selectedDoctor,
+
+        idxetnghiem:
+          selectedXN,
+
+        /*
+         * Không còn "CS001".
+         * Backend có thể fallback
+         * theo CoSoID của bác sĩ.
+         */
+        idcoso:
+          facilityId,
+
+        ghichu:
+          note.trim(),
+      };
+
+      try {
+        setLoading(true);
+
+        await createTestAppointment(
+          payload
+        );
+
+        navigate(
+          '/lich-hen'
+        );
+      } catch (error) {
+        setErrMsg(
+          getApiErrorMessage(
+            error,
+            'Không thể lưu lịch xét nghiệm.'
+          )
+        );
+      } finally {
+        setLoading(false);
+      }
     };
 
-    try {
-      setLoading(true);
-      // Gọi API (createExaminationAppointment hoặc createTestAppointment tùy file)
-      await createTestAppointment(payload); 
-      
-      navigate('/lich-hen'); // Chuyển hướng về trang danh sách thay vì trang chi tiết
-      
-    } catch (error) {
-      setErrMsg(getApiErrorMessage(error, 'Không thể lưu lịch.'));
-    } finally {
-      setLoading(false);
-    }
-  };
+  const todayStr =
+    getLocalToday();
 
-  const todayStr = getLocalToday();
+  // =====================================================
+  // RENDER
+  // =====================================================
 
   return (
-    <div className="container py-4" style={{ maxWidth: '780px' }}>
-      <h3 className="mb-3 fw-bold">ĐẶT LỊCH XÉT NGHIỆM</h3>
+    <div
+      className="container py-4"
+      style={{
+        maxWidth: '780px',
+      }}
+    >
+      <h3 className="mb-3 fw-bold">
+        ĐẶT LỊCH XÉT NGHIỆM
+      </h3>
 
-      {errMsg && <div className="alert alert-danger">{errMsg}</div>}
+      {errMsg && (
+        <div className="alert alert-danger">
+          {errMsg}
+        </div>
+      )}
 
-      <form onSubmit={handleSubmit} className="row g-3" noValidate>
+      <form
+        onSubmit={handleSubmit}
+        className="row g-3"
+        noValidate
+      >
         {/* Chuyên khoa */}
+
         <div className="col-md-6">
-          <label className="form-label">Chuyên khoa</label>
+          <label className="form-label">
+            Chuyên khoa
+          </label>
+
           <select
             className="form-select"
             value={selectedCK}
             onChange={(e) => {
-              setSelectedCK(e.target.value);
+              setSelectedCK(
+                e.target.value
+              );
+
               setSelectedXN('');
               setSelectedDoctor('');
+              setSelectedTime('');
+              setAvailableSlots([]);
             }}
           >
-            {Object.entries(departments).map(([id, name]) => (
-              <option key={id} value={id}>{name}</option>
-            ))}
+            {Object.entries(
+              departments
+            ).map(
+              ([id, name]) => (
+                <option
+                  key={id}
+                  value={id}
+                >
+                  {name}
+                </option>
+              )
+            )}
           </select>
         </div>
 
         {/* Xét nghiệm */}
+
         <div className="col-md-6">
-          <label className="form-label">Xét nghiệm *</label>
+          <label className="form-label">
+            Xét nghiệm *
+          </label>
+
           <select
             className="form-select"
             required
             value={selectedXN}
-            onChange={(e) => setSelectedXN(e.target.value)}
+            onChange={(e) =>
+              setSelectedXN(
+                e.target.value
+              )
+            }
           >
-            <option value="">-- Chọn --</option>
-            {filteredTests.map((test) => {
-              const id = test.IDXetNghiem ?? test.id;
-              const name = test.TenXetNghiem ?? test.name;
-              const price = test.Gia ?? test.price ?? 0;
-              return (
-                <option key={id} value={id}>
-                  {name} — {Number(price).toLocaleString()} đ
-                </option>
-              );
-            })}
+            <option value="">
+              -- Chọn xét nghiệm --
+            </option>
+
+            {filteredTests.map(
+              (test) => {
+                const id =
+                  getTestId(
+                    test
+                  );
+
+                const name =
+                  getTestName(
+                    test
+                  );
+
+                const price =
+                  Number(
+                    getTestPrice(
+                      test
+                    )
+                  ) || 0;
+
+                return (
+                  <option
+                    key={id}
+                    value={id}
+                  >
+                    {name}
+                    {' — '}
+                    {price.toLocaleString(
+                      'vi-VN'
+                    )}
+                    {' đ'}
+                  </option>
+                );
+              }
+            )}
           </select>
+
+          {selectedCK &&
+            filteredTests.length === 0 && (
+              <div className="form-text text-danger">
+                Chưa có xét nghiệm đang hoạt động thuộc chuyên khoa này.
+              </div>
+            )}
+        </div>
+
+        {/* Bác sĩ */}
+
+        <div className="col-md-6">
+          <label className="form-label">
+            Bác sĩ *
+          </label>
+
+          <select
+            className="form-select"
+            required
+            value={selectedDoctor}
+            onChange={(e) => {
+              setSelectedDoctor(
+                e.target.value
+              );
+
+              setSelectedTime('');
+              setAvailableSlots([]);
+            }}
+          >
+            <option value="">
+              -- Chọn bác sĩ --
+            </option>
+
+            {filteredDoctors.map(
+              (doctor) => {
+                const id =
+                  getDoctorId(
+                    doctor
+                  );
+
+                const name =
+                  getDoctorName(
+                    doctor
+                  );
+
+                return (
+                  <option
+                    key={id}
+                    value={id}
+                  >
+                    {name}
+                  </option>
+                );
+              }
+            )}
+          </select>
+
+          {selectedCK &&
+            filteredDoctors.length === 0 && (
+              <div className="form-text text-danger">
+                Chưa có bác sĩ đang hoạt động thuộc chuyên khoa này.
+              </div>
+            )}
         </div>
 
         {/* Ngày */}
+
         <div className="col-md-6">
-          <label className="form-label">Ngày *</label>
+          <label className="form-label">
+            Ngày xét nghiệm *
+          </label>
+
           <input
             type="date"
             className="form-control"
             required
             min={todayStr}
             value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
+            onChange={(e) => {
+              setSelectedDate(
+                e.target.value
+              );
+
+              setSelectedTime('');
+            }}
           />
         </div>
 
         {/* Giờ */}
+
         <div className="col-md-6">
-          <label className="form-label">Giờ *</label>
+          <label className="form-label">
+            Giờ *
+          </label>
+
           <select
             className="form-select"
             required
             value={selectedTime}
-            onChange={(e) => setSelectedTime(e.target.value)}
+            disabled={
+              !selectedDoctor ||
+              !selectedDate ||
+              slotsLoading
+            }
+            onChange={(e) =>
+              setSelectedTime(
+                e.target.value
+              )
+            }
           >
-            <option value="">-- Chọn giờ --</option>
-            {SLOTS.map((slot) => {
-              const isTaken = takenTimes.has(slot);
-              return (
-                <option key={slot} value={slot} disabled={isTaken}>
-                  {slot} {isTaken ? '(đã kín)' : ''}
-                </option>
-              );
-            })}
-          </select>
-        </div>
+            <option value="">
+              {slotsLoading
+                ? 'Đang tải khung giờ...'
+                : !selectedDoctor
+                  ? '-- Chọn bác sĩ trước --'
+                  : !selectedDate
+                    ? '-- Chọn ngày trước --'
+                    : '-- Chọn giờ --'}
+            </option>
 
-        {/* Bác sĩ */}
-        <div className="col-md-6">
-          <label className="form-label">Bác sĩ *</label>
-          <select
-            className="form-select"
-            required
-            value={selectedDoctor}
-            onChange={(e) => setSelectedDoctor(e.target.value)}
-          >
-            <option value="">-- Chọn --</option>
-            {filteredDoctors.map((doctor) => {
-              const id = doctor.IDBacSi ?? doctor.id;
-              const name = doctor.TenBacSi ?? doctor.doctorName ?? doctor.name;
-              return (
-                <option key={id} value={id}>
-                  {name} ({id})
+            {availableSlots.map(
+              (slot) => (
+                <option
+                  key={slot}
+                  value={slot}
+                >
+                  {slot}
                 </option>
-              );
-            })}
+              )
+            )}
           </select>
+
+          {selectedDoctor &&
+            selectedDate &&
+            !slotsLoading &&
+            availableSlots.length === 0 && (
+              <div className="form-text text-danger">
+                Bác sĩ không có khung giờ trống trong ngày này.
+              </div>
+            )}
         </div>
 
         {/* Đặt cho người khác */}
+
         <div className="col-12 mt-4">
           <div className="form-check">
             <input
@@ -390,72 +1127,153 @@ export default function DatLichXetNghiem({
               id="forOther"
               className="form-check-input"
               checked={forOther}
-              onChange={(e) => setForOther(e.target.checked)}
+              onChange={(e) =>
+                setForOther(
+                  e.target.checked
+                )
+              }
             />
-            <label className="form-check-label fw-bold" htmlFor="forOther">
+
+            <label
+              className="form-check-label fw-bold"
+              htmlFor="forOther"
+            >
               Đặt cho người khác
             </label>
           </div>
         </div>
 
-        {/* KHỐI NHẬP THÔNG TIN (Chỉ hiển thị khi tích chọn Đặt cho người khác) */}
+        {/* Patient */}
+
         {forOther && (
           <div className="col-12">
             <div className="row g-3 p-3 border rounded bg-light">
               <div className="col-md-6">
-                <label className="form-label">Họ tên *</label>
+                <label className="form-label">
+                  Họ tên *
+                </label>
+
                 <input
                   type="text"
                   className="form-control"
                   required
-                  value={otherInfo.p_name}
-                  onChange={(e) => setOtherInfo({ ...otherInfo, p_name: e.target.value })}
+                  value={
+                    otherInfo.p_name
+                  }
+                  onChange={(e) =>
+                    setOtherInfo({
+                      ...otherInfo,
+
+                      p_name:
+                        e.target.value,
+                    })
+                  }
                 />
               </div>
 
               <div className="col-md-3">
-                <label className="form-label">SĐT *</label>
+                <label className="form-label">
+                  SĐT *
+                </label>
+
                 <input
                   type="text"
                   className="form-control"
                   required
-                  value={otherInfo.p_phone}
-                  onChange={(e) => setOtherInfo({ ...otherInfo, p_phone: e.target.value })}
+                  value={
+                    otherInfo.p_phone
+                  }
+                  onChange={(e) =>
+                    setOtherInfo({
+                      ...otherInfo,
+
+                      p_phone:
+                        e.target.value,
+                    })
+                  }
                 />
               </div>
 
               <div className="col-md-3">
-                <label className="form-label">Giới tính</label>
+                <label className="form-label">
+                  Giới tính
+                </label>
+
                 <select
                   className="form-select"
-                  value={otherInfo.p_gender}
-                  onChange={(e) => setOtherInfo({ ...otherInfo, p_gender: e.target.value })}
+                  value={
+                    otherInfo.p_gender
+                  }
+                  onChange={(e) =>
+                    setOtherInfo({
+                      ...otherInfo,
+
+                      p_gender:
+                        e.target.value,
+                    })
+                  }
                 >
-                  <option value="">--</option>
-                  <option value="nam">Nam</option>
-                  <option value="nu">Nữ</option>
-                  <option value="khac">Khác</option>
+                  <option value="">
+                    --
+                  </option>
+
+                  <option value="nam">
+                    Nam
+                  </option>
+
+                  <option value="nu">
+                    Nữ
+                  </option>
+
+                  <option value="khac">
+                    Khác
+                  </option>
                 </select>
               </div>
 
               <div className="col-md-4">
-                <label className="form-label">Ngày sinh</label>
+                <label className="form-label">
+                  Ngày sinh
+                </label>
+
                 <input
                   type="date"
                   className="form-control"
-                  value={otherInfo.p_dob}
-                  onChange={(e) => setOtherInfo({ ...otherInfo, p_dob: e.target.value })}
+                  max={todayStr}
+                  value={
+                    otherInfo.p_dob
+                  }
+                  onChange={(e) =>
+                    setOtherInfo({
+                      ...otherInfo,
+
+                      p_dob:
+                        e.target.value,
+                    })
+                  }
                 />
               </div>
 
               <div className="col-md-8">
-                <label className="form-label">Email nhận thông tin *</label>
+                <label className="form-label">
+                  Email nhận thông tin *
+                </label>
+
                 <input
                   type="email"
                   className="form-control"
                   required
-                  value={otherInfo.p_email}
-                  onChange={(e) => setOtherInfo({ ...otherInfo, p_email: e.target.value })}
+                  value={
+                    otherInfo.p_email
+                  }
+                  onChange={(e) =>
+                    setOtherInfo({
+                      ...otherInfo,
+
+                      p_email:
+                        e.target.value,
+                    })
+                  }
                 />
               </div>
             </div>
@@ -463,28 +1281,48 @@ export default function DatLichXetNghiem({
         )}
 
         {/* Ghi chú */}
+
         <div className="col-12 mt-3">
-          <label className="form-label">Ghi chú</label>
+          <label className="form-label">
+            Ghi chú
+          </label>
+
           <textarea
-            rows="2"
+            rows="3"
             className="form-control"
             placeholder="Yêu cầu thêm (nếu có)"
+            maxLength={500}
             value={note}
-            onChange={(e) => setNote(e.target.value)}
+            onChange={(e) =>
+              setNote(
+                e.target.value
+              )
+            }
           />
         </div>
+
+        {/* Submit */}
 
         <div className="col-12 mt-4">
           <button
             type="submit"
             className="btn btn-primary px-4 py-2"
-            disabled={loading}
+            disabled={
+              loading ||
+              slotsLoading ||
+              !selectedTime
+            }
             style={{
-              backgroundColor: 'var(--primary, #0b63e5)',
-              borderColor: 'var(--primary, #0b63e5)',
+              backgroundColor:
+                'var(--primary, #0b63e5)',
+
+              borderColor:
+                'var(--primary, #0b63e5)',
             }}
           >
-            {loading ? 'Đang xử lý...' : 'Xác nhận'}
+            {loading
+              ? 'Đang xử lý...'
+              : 'Xác nhận'}
           </button>
         </div>
       </form>

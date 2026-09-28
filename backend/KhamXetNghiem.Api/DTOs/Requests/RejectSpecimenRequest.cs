@@ -4,8 +4,6 @@ namespace KhamXetNghiem.Api.DTOs.Requests;
 
 public sealed class RejectSpecimenRequest
 {
-    [Required(
-        ErrorMessage = "Vui lòng nhập lý do từ chối mẫu."
-    )]
+    [Required]
     public string Reason { get; set; } = string.Empty;
 }

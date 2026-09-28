@@ -1,162 +1,204 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+} from 'react';
+
+import {
+  Link,
+} from 'react-router-dom';
 
 import Loading from '../../components/Loading';
 import Notification from '../../components/Notification';
 
-import { getSpecimens } from '../../services/technicianService';
-import { getApiErrorMessage } from '../../services/api';
+import {
+  getSpecimens,
+} from '../../services/technicianService';
 
-const normalizeSpecimen = (item = {}) => ({
-  id:
-    item.id ??
-    item.idMauBenhPham ??
-    item.IDMauBenhPham,
+import {
+  getApiErrorMessage,
+} from '../../services/api';
 
-  code:
-    item.code ??
-    item.maMau ??
-    item.MaMau ??
-    '—',
+const getStatusClass =
+  (status) => {
+    switch (
+      String(
+        status ||
+        '',
+      ).toUpperCase()
+    ) {
+      case 'HANDED_OVER':
+        return 'bg-warning-subtle text-warning-emphasis';
 
-  barcode:
-    item.barcode ??
-    item.maVach ??
-    item.MaVach ??
-    '—',
+      case 'RECEIVED':
+        return 'bg-success-subtle text-success';
 
-  patient:
-    item.patient ??
-    item.patientName ??
-    item.tenKhachHang ??
-    item.TenKhachHang ??
-    '—',
+      case 'REJECTED':
+        return 'bg-danger-subtle text-danger';
 
-  specimenType:
-    item.specimenType ??
-    item.type ??
-    item.loaiMau ??
-    item.LoaiMau ??
-    '—',
+      case 'PROCESSING':
+      case 'IN_PROGRESS':
+        return 'bg-info-subtle text-info-emphasis';
 
-  collectedAt:
-    item.collectedAt ??
-    item.thoiGianLay ??
-    item.ThoiGianLay ??
-    item.ngayLay ??
-    '—',
+      case 'COMPLETED':
+        return 'bg-primary-subtle text-primary';
 
-  status:
-    item.status ??
-    item.trangThai ??
-    item.TrangThai ??
-    'HANDED_OVER',
-});
-
-const getStatusClass = (status) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'RECEIVED':
-      return 'bg-success-subtle text-success';
-
-    case 'REJECTED':
-      return 'bg-danger-subtle text-danger';
-
-    case 'PROCESSING':
-    case 'IN_PROGRESS':
-      return 'bg-warning-subtle text-warning-emphasis';
-
-    case 'COMPLETED':
-      return 'bg-primary-subtle text-primary';
-
-    default:
-      return 'bg-secondary-subtle text-secondary';
-  }
-};
-
-const getStatusText = (status) => {
-  switch (String(status || '').toUpperCase()) {
-    case 'HANDED_OVER':
-      return 'Chờ tiếp nhận';
-
-    case 'RECEIVED':
-      return 'Đã tiếp nhận';
-
-    case 'REJECTED':
-      return 'Đã từ chối';
-
-    case 'PROCESSING':
-    case 'IN_PROGRESS':
-      return 'Đang xử lý';
-
-    case 'COMPLETED':
-      return 'Hoàn tất';
-
-    default:
-      return status || 'Chưa xác định';
-  }
-};
-
-export default function DanhSachMau() {
-  const [specimens, setSpecimens] = useState([]);
-  const [keyword, setKeyword] = useState('');
-  const [status, setStatus] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
-
-  const loadSpecimens = async () => {
-    try {
-      setLoading(true);
-      setError('');
-
-      const data = await getSpecimens({
-        status: status || undefined,
-      });
-
-      const list = Array.isArray(data)
-        ? data
-        : data?.content ||
-          data?.items ||
-          data?.data ||
-          [];
-
-      setSpecimens(
-        list.map(normalizeSpecimen)
-      );
-    } catch (err) {
-      setError(
-        getApiErrorMessage(
-          err,
-          'Không thể tải danh sách mẫu bệnh phẩm.'
-        )
-      );
-    } finally {
-      setLoading(false);
+      default:
+        return 'bg-secondary-subtle text-secondary';
     }
   };
+
+const getStatusText =
+  (status) => {
+    switch (
+      String(
+        status ||
+        '',
+      ).toUpperCase()
+    ) {
+      case 'HANDED_OVER':
+        return 'Chờ tiếp nhận';
+
+      case 'RECEIVED':
+        return 'Đã tiếp nhận';
+
+      case 'REJECTED':
+        return 'Đã từ chối';
+
+      case 'PROCESSING':
+      case 'IN_PROGRESS':
+        return 'Đang xử lý';
+
+      case 'COMPLETED':
+        return 'Hoàn tất';
+
+      default:
+        return (
+          status ||
+          'Chưa xác định'
+        );
+    }
+  };
+
+const formatDateTime =
+  (value) => {
+    if (!value) {
+      return '—';
+    }
+
+    const date =
+      new Date(value);
+
+    if (
+      Number.isNaN(
+        date.getTime(),
+      )
+    ) {
+      return value;
+    }
+
+    return date.toLocaleString(
+      'vi-VN',
+    );
+  };
+
+export default function DanhSachMau() {
+  const [
+    specimens,
+    setSpecimens,
+  ] = useState([]);
+
+  const [
+    keyword,
+    setKeyword,
+  ] = useState('');
+
+  const [
+    status,
+    setStatus,
+  ] = useState('');
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    error,
+    setError,
+  ] = useState('');
+
+  const loadSpecimens =
+    async () => {
+      try {
+        setLoading(
+          true,
+        );
+
+        setError('');
+
+        const data =
+          await getSpecimens({
+            status:
+              status ||
+              undefined,
+          });
+
+        setSpecimens(
+          Array.isArray(data)
+            ? data
+            : [],
+        );
+      } catch (err) {
+        setError(
+          getApiErrorMessage(
+            err,
+            'Không thể tải danh sách mẫu bệnh phẩm.',
+          ),
+        );
+      } finally {
+        setLoading(
+          false,
+        );
+      }
+    };
 
   useEffect(() => {
     loadSpecimens();
   }, [status]);
 
-  const filteredSpecimens = useMemo(() => {
-    const q = keyword.trim().toLowerCase();
+  const filteredSpecimens =
+    useMemo(
+      () => {
+        const q =
+          keyword
+            .trim()
+            .toLowerCase();
 
-    if (!q) {
-      return specimens;
-    }
+        if (!q) {
+          return specimens;
+        }
 
-    return specimens.filter((item) =>
+        return specimens.filter(
+          (item) =>
+            [
+              item.id,
+              item.barcode,
+              item.patientName,
+              item.specimenType,
+              item.testName,
+            ]
+              .filter(Boolean)
+              .join(' ')
+              .toLowerCase()
+              .includes(q),
+        );
+      },
       [
-        item.code,
-        item.barcode,
-        item.patient,
-        item.specimenType,
-      ]
-        .join(' ')
-        .toLowerCase()
-        .includes(q)
+        specimens,
+        keyword,
+      ],
     );
-  }, [specimens, keyword]);
 
   return (
     <div>
@@ -167,15 +209,19 @@ export default function DanhSachMau() {
           </h1>
 
           <p className="text-secondary mb-0">
-            Theo dõi các mẫu được bàn giao đến phòng xét nghiệm.
+            Các mẫu được bàn giao trực tiếp cho kỹ thuật viên đang đăng nhập.
           </p>
         </div>
 
         <button
           type="button"
           className="btn btn-outline-primary"
-          onClick={loadSpecimens}
-          disabled={loading}
+          onClick={
+            loadSpecimens
+          }
+          disabled={
+            loading
+          }
         >
           <i className="fa-solid fa-rotate me-2" />
           Làm mới
@@ -186,7 +232,9 @@ export default function DanhSachMau() {
         <Notification
           type="danger"
           message={error}
-          onClose={() => setError('')}
+          onClose={() =>
+            setError('')
+          }
         />
       )}
 
@@ -194,26 +242,32 @@ export default function DanhSachMau() {
         <div className="card-body p-4">
           <div className="row g-3 mb-4">
             <div className="col-lg-8">
-              <div className="input-group">
-                <span className="input-group-text bg-white">
-                  <i className="fa-solid fa-magnifying-glass text-secondary" />
-                </span>
-
-                <input
-                  type="search"
-                  className="form-control"
-                  placeholder="Tìm mã mẫu, mã vạch, tên người bệnh..."
-                  value={keyword}
-                  onChange={(e) => setKeyword(e.target.value)}
-                />
-              </div>
+              <input
+                type="search"
+                className="form-control"
+                placeholder="Tìm mã mẫu, barcode, tên bệnh nhân, xét nghiệm..."
+                value={
+                  keyword
+                }
+                onChange={(e) =>
+                  setKeyword(
+                    e.target.value,
+                  )
+                }
+              />
             </div>
 
             <div className="col-lg-4">
               <select
                 className="form-select"
-                value={status}
-                onChange={(e) => setStatus(e.target.value)}
+                value={
+                  status
+                }
+                onChange={(e) =>
+                  setStatus(
+                    e.target.value,
+                  )
+                }
               >
                 <option value="">
                   Tất cả trạng thái
@@ -249,7 +303,7 @@ export default function DanhSachMau() {
               <table className="table table-hover align-middle">
                 <thead className="table-light">
                   <tr>
-                    <th style={{ width: 60 }}>
+                    <th>
                       #
                     </th>
 
@@ -258,11 +312,15 @@ export default function DanhSachMau() {
                     </th>
 
                     <th>
-                      Mã vạch
+                      Barcode
                     </th>
 
                     <th>
                       Người bệnh
+                    </th>
+
+                    <th>
+                      Xét nghiệm
                     </th>
 
                     <th>
@@ -277,68 +335,96 @@ export default function DanhSachMau() {
                       Trạng thái
                     </th>
 
-                    <th className="text-end">
-                      Thao tác
-                    </th>
+                    <th />
                   </tr>
                 </thead>
 
                 <tbody>
-                  {filteredSpecimens.length > 0 ? (
-                    filteredSpecimens.map((item, index) => (
-                      <tr key={item.id ?? index}>
-                        <td>
-                          {index + 1}
-                        </td>
+                  {filteredSpecimens.length >
+                  0 ? (
+                    filteredSpecimens.map(
+                      (
+                        item,
+                        index,
+                      ) => (
+                        <tr
+                          key={
+                            item.id
+                          }
+                        >
+                          <td>
+                            {index +
+                              1}
+                          </td>
 
-                        <td className="fw-semibold">
-                          {item.code}
-                        </td>
+                          <td className="fw-semibold text-primary">
+                            {
+                              item.id
+                            }
+                          </td>
 
-                        <td>
-                          {item.barcode}
-                        </td>
+                          <td>
+                            {
+                              item.barcode
+                            }
+                          </td>
 
-                        <td>
-                          {item.patient}
-                        </td>
+                          <td>
+                            {
+                              item.patientName
+                            }
+                          </td>
 
-                        <td>
-                          {item.specimenType}
-                        </td>
+                          <td>
+                            {
+                              item.testName
+                            }
+                          </td>
 
-                        <td>
-                          {item.collectedAt}
-                        </td>
+                          <td>
+                            {
+                              item.specimenType
+                            }
+                          </td>
 
-                        <td>
-                          <span
-                            className={`badge ${getStatusClass(
-                              item.status
-                            )}`}
-                          >
-                            {getStatusText(item.status)}
-                          </span>
-                        </td>
+                          <td>
+                            {formatDateTime(
+                              item.collectedAt,
+                            )}
+                          </td>
 
-                        <td className="text-end">
-                          <Link
-                            to={`/technician/tiep-nhan-mau/${item.id}`}
-                            className="btn btn-sm btn-primary"
-                          >
-                            <i className="fa-solid fa-eye me-2" />
-                            Xem mẫu
-                          </Link>
-                        </td>
-                      </tr>
-                    ))
+                          <td>
+                            <span
+                              className={`badge ${getStatusClass(
+                                item.status,
+                              )}`}
+                            >
+                              {getStatusText(
+                                item.status,
+                              )}
+                            </span>
+                          </td>
+
+                          <td className="text-end">
+                            <Link
+                              to={`/technician/tiep-nhan-mau/${encodeURIComponent(
+                                item.id,
+                              )}`}
+                              className="btn btn-sm btn-primary"
+                            >
+                              Xem mẫu
+                            </Link>
+                          </td>
+                        </tr>
+                      ),
+                    )
                   ) : (
                     <tr>
                       <td
-                        colSpan="8"
+                        colSpan="9"
                         className="text-center text-secondary py-5"
                       >
-                        Chưa có mẫu bệnh phẩm phù hợp.
+                        Không có mẫu phù hợp.
                       </td>
                     </tr>
                   )}

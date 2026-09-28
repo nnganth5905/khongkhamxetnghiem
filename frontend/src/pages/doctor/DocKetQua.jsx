@@ -1,194 +1,567 @@
-// src/pages/doctor/DocKetQua.jsx
-import React, { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { getApiErrorMessage } from '../../services/api';
-import api from '../../services/api';
+import React, {
+  useEffect,
+  useState,
+} from 'react';
 
-export default function DocKetQua() {
-  const { id } = useParams();
-  const navigate = useNavigate();
+import {
+  useNavigate,
+  useParams,
+} from 'react-router-dom';
 
-  const [resultData, setResultData] = useState(null);
-  const [conclusion, setConclusion] = useState('');
-  const [advice, setAdvice] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [message, setMessage] = useState({ type: '', text: '' });
+import Loading from '../../components/Loading';
+import Notification from '../../components/Notification';
 
-  useEffect(() => {
-    let active = true;
+import {
+  approveDoctorResult,
+  getDoctorResultDetail,
+} from '../../services/doctorService';
 
-    const fetchResult = async () => {
-      try {
-        setLoading(true);
-        if (id) {
-          const response = await api.get(`/doctor/results/${id}`);
-          const data = response.data ?? response;
-          
-          if (active && data) {
-            setResultData(data);
-          }
-        }
-      } catch (err) {
-        if (active) {
-          setMessage({
-            type: 'danger',
-            text: getApiErrorMessage(err, 'Không thể tải chi tiết kết quả xét nghiệm.'),
-          });
-        }
-      } finally {
-        if (active) setLoading(false);
-      }
-    };
+import {
+  getApiErrorMessage,
+} from '../../services/api';
 
-    fetchResult();
-    return () => {
-      active = false;
-    };
-  }, [id]);
+const evaluationText =
+  (value) => {
+    switch (
+      String(
+        value ||
+        '',
+      ).toLowerCase()
+    ) {
+      case 'binh_thuong':
+        return 'Bình thường';
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
-    setMessage({ type: '', text: '' });
+      case 'thap':
+        return 'Thấp';
 
-    try {
-      // Gửi kết luận lên API duyệt kết quả
-      await api.post(`/doctor/results/${id}/approve`, {
-        conclusion: conclusion + (advice ? `\nLời khuyên: ${advice}` : ''),
-      });
+      case 'cao':
+        return 'Cao';
 
-      setMessage({
-        type: 'success',
-        text: 'Lưu kết luận và duyệt thành công!',
-      });
-      setTimeout(() => {
-        navigate(-1); // Quay lại trang danh sách chờ duyệt
-      }, 800);
-    } catch (err) {
-      setMessage({
-        type: 'danger',
-        text: getApiErrorMessage(err, 'Không thể lưu kết luận đọc kết quả.'),
-      });
-    } finally {
-      setSubmitting(false);
+      case 'bat_thuong':
+        return 'Bất thường';
+
+      default:
+        return 'Chưa đánh giá';
     }
   };
 
+const evaluationClass =
+  (value) => {
+    switch (
+      String(
+        value ||
+        '',
+      ).toLowerCase()
+    ) {
+      case 'binh_thuong':
+        return 'bg-success-subtle text-success';
+
+      case 'thap':
+      case 'cao':
+      case 'bat_thuong':
+        return 'bg-danger-subtle text-danger';
+
+      default:
+        return 'bg-secondary-subtle text-secondary';
+    }
+  };
+
+export default function DocKetQua() {
+  const {
+    id,
+  } = useParams();
+
+  const navigate =
+    useNavigate();
+
+  const [
+    data,
+    setData,
+  ] = useState(null);
+
+  const [
+    conclusion,
+    setConclusion,
+  ] = useState('');
+
+  const [
+    advice,
+    setAdvice,
+  ] = useState('');
+
+  const [
+    loading,
+    setLoading,
+  ] = useState(true);
+
+  const [
+    submitting,
+    setSubmitting,
+  ] = useState(false);
+
+  const [
+    message,
+    setMessage,
+  ] = useState({
+    type: '',
+    text: '',
+  });
+
+  const load =
+    async () => {
+      if (!id) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            'Thiếu mã kết quả.',
+        });
+
+        setLoading(
+          false,
+        );
+
+        return;
+      }
+
+      try {
+        setLoading(
+          true,
+        );
+
+        const result =
+          await getDoctorResultDetail(
+            id,
+          );
+
+        setData(
+          result,
+        );
+
+        setConclusion(
+          result?.doctorConclusion ||
+          '',
+        );
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể tải kết quả xét nghiệm.',
+            ),
+        });
+      } finally {
+        setLoading(
+          false,
+        );
+      }
+    };
+
+  useEffect(() => {
+    load();
+  }, [id]);
+
+  const handleApprove =
+    async (e) => {
+      e.preventDefault();
+
+      if (
+        !conclusion.trim()
+      ) {
+        setMessage({
+          type:
+            'warning',
+
+          text:
+            'Vui lòng nhập kết luận của bác sĩ.',
+        });
+
+        return;
+      }
+
+      if (
+        !window.confirm(
+          'Xác nhận duyệt kết quả xét nghiệm này?',
+        )
+      ) {
+        return;
+      }
+
+      try {
+        setSubmitting(
+          true,
+        );
+
+        const finalConclusion =
+          advice.trim()
+            ? `${conclusion.trim()}\nLời khuyên: ${advice.trim()}`
+            : conclusion.trim();
+
+        const result =
+          await approveDoctorResult(
+            id,
+            finalConclusion,
+          );
+
+        setMessage({
+          type:
+            'success',
+
+          text:
+            result?.message ||
+            'Duyệt kết quả thành công.',
+        });
+
+        setTimeout(
+          () =>
+            navigate(
+              '/doctor/duyet-ket-qua',
+            ),
+          900,
+        );
+      } catch (err) {
+        setMessage({
+          type:
+            'danger',
+
+          text:
+            getApiErrorMessage(
+              err,
+              'Không thể duyệt kết quả.',
+            ),
+        });
+      } finally {
+        setSubmitting(
+          false,
+        );
+      }
+    };
+
+  if (loading) {
+    return (
+      <Loading text="Đang tải kết quả..." />
+    );
+  }
+
+  const canApprove =
+    data?.status ===
+    'PENDING_APPROVAL';
+
   return (
-    <div className="container py-4" style={{ maxWidth: '900px' }}>
+    <div
+      className="container py-4"
+      style={{
+        maxWidth:
+          980,
+      }}
+    >
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <h2 className="h4 fw-bold mb-1">Đọc và trả kết quả xét nghiệm</h2>
-          <p className="text-secondary mb-0">Bác sĩ đọc chỉ số và đưa ra chẩn đoán, lời khuyên</p>
+          <h2 className="h4 fw-bold mb-1">
+            Đọc & duyệt kết quả
+          </h2>
+
+          <p className="text-secondary mb-0">
+            Kiểm tra chỉ số xét nghiệm và đưa ra kết luận chuyên môn.
+          </p>
         </div>
+
         <button
           type="button"
-          className="btn btn-outline-secondary btn-sm"
-          onClick={() => navigate(-1)}
+          className="btn btn-outline-secondary"
+          onClick={() =>
+            navigate(
+              '/doctor/duyet-ket-qua',
+            )
+          }
         >
+          <i className="fa-solid fa-arrow-left me-2" />
           Quay lại
         </button>
       </div>
 
       {message.text && (
-        <div className={`alert alert-${message.type} mb-3`} role="alert">
-          {message.text}
-        </div>
+        <Notification
+          type={
+            message.type
+          }
+          message={
+            message.text
+          }
+          onClose={() =>
+            setMessage({
+              type: '',
+              text: '',
+            })
+          }
+        />
       )}
 
-      {loading ? (
-        <div className="text-center py-5 text-secondary">Đang tải dữ liệu kết quả...</div>
+      {!data ? (
+        <div className="alert alert-warning">
+          Không tìm thấy kết quả.
+        </div>
       ) : (
         <>
-          {/* Thông tin bệnh nhân và chỉ số xét nghiệm */}
-          <div className="card border-0 shadow-sm rounded-4 p-4 mb-4">
-            <h5 className="fw-bold mb-3 text-primary">Thông tin xét nghiệm: {resultData?.testName}</h5>
-            <div className="row mb-4">
-              <div className="col-md-6">
-                <p className="mb-1"><strong>Người bệnh:</strong> {resultData?.patientName}</p>
-                <p className="mb-1"><strong>Mã mẫu:</strong> {resultData?.specimenCode}</p>
-              </div>
-              <div className="col-md-6">
-                <p className="mb-1"><strong>Ghi chú từ KTV:</strong> <span className="text-danger">{resultData?.technicianNotes || 'Không có ghi chú'}</span></p>
-              </div>
-            </div>
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <h5 className="fw-bold text-primary mb-4">
+                {
+                  data.testName
+                }
+              </h5>
 
-            <h6 className="fw-bold mb-2">Bảng chỉ số chi tiết</h6>
-            <div className="table-responsive">
-              <table className="table table-bordered align-middle">
-                <thead className="table-light">
-                  <tr>
-                    <th>Chỉ số</th>
-                    <th>Kết quả đo</th>
-                    <th>Đơn vị</th>
-                    <th>Đánh giá của KTV</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {resultData?.indicators?.length > 0 ? (
-                    resultData.indicators.map((ind, i) => (
-                      <tr key={i}>
-                        <td className="fw-semibold">{ind.name}</td>
-                        <td className={ind.abnormal ? 'text-danger fw-bold' : ''}>{ind.value || '---'}</td>
-                        <td>{ind.unit}</td>
-                        <td>
-                          {ind.abnormal ? (
-                            <span className="badge bg-danger">Bất thường</span>
-                          ) : (
-                            <span className="badge bg-success">Bình thường</span>
-                          )}
-                        </td>
-                      </tr>
-                    ))
-                  ) : (
-                    <tr>
-                      <td colSpan="4" className="text-center text-muted">Chưa có chỉ số.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <div className="row g-3">
+                <Info
+                  label="Người bệnh"
+                  value={
+                    data.patientName
+                  }
+                />
+
+                <Info
+                  label="Barcode"
+                  value={
+                    data.specimenCode
+                  }
+                />
+
+                <Info
+                  label="Kỹ thuật viên"
+                  value={
+                    data.technicianName
+                  }
+                />
+
+                <Info
+                  label="Trạng thái"
+                  value={
+                    data.status
+                  }
+                />
+              </div>
+
+              {data.technicianNotes && (
+                <div className="alert alert-light border mt-4 mb-0">
+                  <strong>
+                    Ghi chú KTV:
+                  </strong>{' '}
+                  {
+                    data.technicianNotes
+                  }
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Form nhập kết luận */}
-          <form className="card border-0 shadow-sm rounded-4 p-4" onSubmit={handleSubmit}>
-            <div className="mb-3">
-              <label className="form-label fw-semibold">Kết luận của bác sĩ *</label>
-              <textarea
-                rows="3"
-                className="form-control"
-                placeholder="Nhập kết luận chuyên môn..."
-                value={conclusion}
-                onChange={(e) => setConclusion(e.target.value)}
-                required
-              />
-            </div>
+          <div className="card border-0 shadow-sm rounded-4 mb-4">
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-4">
+                Kết quả chỉ số
+              </h5>
 
-            <div className="mb-3">
-              <label className="form-label fw-semibold">Lời khuyên / Hướng điều trị</label>
-              <textarea
-                rows="3"
-                className="form-control"
-                placeholder="Chế độ dinh dưỡng, đơn thuốc, lịch hẹn tái khám..."
-                value={advice}
-                onChange={(e) => setAdvice(e.target.value)}
-              />
-            </div>
+              <div className="table-responsive">
+                <table className="table table-hover align-middle">
+                  <thead className="table-light">
+                    <tr>
+                      <th>
+                        Chỉ số
+                      </th>
 
-            <div className="mt-3 text-end">
-              <button
-                type="submit"
-                className="btn btn-primary px-4"
-                disabled={submitting}
-              >
-                <i className="fa-solid fa-check-double me-2"></i>
-                {submitting ? 'Đang lưu...' : 'Ký Duyệt & Trả Kết Quả'}
-              </button>
+                      <th>
+                        Kết quả
+                      </th>
+
+                      <th>
+                        Đơn vị
+                      </th>
+
+                      <th>
+                        Tham chiếu
+                      </th>
+
+                      <th>
+                        Đánh giá
+                      </th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {(data.indicators ||
+                      []).map(
+                      (item) => (
+                        <tr
+                          key={
+                            item.indicatorId
+                          }
+                        >
+                          <td className="fw-semibold">
+                            {
+                              item.name
+                            }
+                          </td>
+
+                          <td
+                            className={
+                              item.abnormal
+                                ? 'text-danger fw-bold'
+                                : 'fw-semibold'
+                            }
+                          >
+                            {
+                              item.value
+                            }
+                          </td>
+
+                          <td>
+                            {item.unit ||
+                              '—'}
+                          </td>
+
+                          <td>
+                            {item.reference ||
+                              '—'}
+                          </td>
+
+                          <td>
+                            <span
+                              className={`badge ${evaluationClass(
+                                item.evaluation,
+                              )}`}
+                            >
+                              {evaluationText(
+                                item.evaluation,
+                              )}
+                            </span>
+                          </td>
+                        </tr>
+                      ),
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              {data.generalResult && (
+                <div className="mt-3">
+                  <strong>
+                    Kết quả tổng quát:
+                  </strong>
+
+                  <div className="mt-2">
+                    {
+                      data.generalResult
+                    }
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <form
+            className="card border-0 shadow-sm rounded-4"
+            onSubmit={
+              handleApprove
+            }
+          >
+            <div className="card-body p-4">
+              <h5 className="fw-bold mb-4">
+                Kết luận bác sĩ
+              </h5>
+
+              <div className="mb-3">
+                <label className="form-label fw-semibold">
+                  Kết luận{' '}
+                  <span className="text-danger">
+                    *
+                  </span>
+                </label>
+
+                <textarea
+                  className="form-control"
+                  rows="4"
+                  value={
+                    conclusion
+                  }
+                  disabled={
+                    !canApprove ||
+                    submitting
+                  }
+                  onChange={(e) =>
+                    setConclusion(
+                      e.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              <div className="mb-4">
+                <label className="form-label fw-semibold">
+                  Lời khuyên
+                </label>
+
+                <textarea
+                  className="form-control"
+                  rows="3"
+                  value={
+                    advice
+                  }
+                  disabled={
+                    !canApprove ||
+                    submitting
+                  }
+                  onChange={(e) =>
+                    setAdvice(
+                      e.target.value,
+                    )
+                  }
+                />
+              </div>
+
+              {canApprove ? (
+                <button
+                  type="submit"
+                  className="btn btn-success px-4"
+                  disabled={
+                    submitting
+                  }
+                >
+                  <i className="fa-solid fa-circle-check me-2" />
+
+                  {submitting
+                    ? 'Đang duyệt...'
+                    : 'Duyệt kết quả'}
+                </button>
+              ) : (
+                <div className="alert alert-success mb-0">
+                  Kết quả đã được xử lý.
+                </div>
+              )}
             </div>
           </form>
         </>
       )}
+    </div>
+  );
+}
+
+function Info({
+  label,
+  value,
+}) {
+  return (
+    <div className="col-md-3">
+      <div className="small text-secondary">
+        {label}
+      </div>
+
+      <div className="fw-semibold">
+        {value ||
+          '—'}
+      </div>
     </div>
   );
 }
